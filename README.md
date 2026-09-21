@@ -26,21 +26,29 @@ notes/        problem statement + changelog
 
 The 458 MB `Weather-suaida-project.zip` is **not** this paper’s pipeline. It is a QC/anomaly project on the same KAPSARC source. Use it only as a data pointer. Do not run its stage-1…8 QC scripts for this revision.
 
-## Data status
+## Clone on RunPod
 
-Paper claims: **29 stations**, 1 Jan 2009 – 24 May 2019, **2,775,657** complete hourly rows.
-
-What the zip actually contains as usable CSV: **4 stations** (Abha, Al Ahsa, Dammam, Gassim), Jan 2018 – May 2019, **63,266** rows. Visibility in that extract is **0.0–0.9** (not metres). It cannot reproduce submitted Table 5 and must not be treated as production input until units and coverage are resolved.
-
-## Run order (do not skip Stage 1)
+The 5 GB historical zip and `features.parquet` are **not** on GitHub. Upload `saudi-hourly-weather-data_Historical.zip` to the pod separately.
 
 ```bash
-cd code
+git clone https://github.com/tayyabriaz60/ML-Model.git
+cd ML-Model/code
 pip install -r requirements.txt
-set KAPSARC_RAW=..\data\raw
-set N_TRIALS=24
+export N_TRIALS=24
+export KAPSARC_RAW=/path/to/saudi-hourly-weather-data_Historical.zip
 python run_all.py --stage audit
+python run_all.py --stage features
+python run_all.py --stage tune
 ```
+
+If audit + features already ran locally, copy `code/data/processed/*.parquet` onto the pod and start at `--stage tune`.
+
+## Data status
+
+Production source: `saudi-hourly-weather-data_Historical.zip` (9.27M rows, 88 stations, visibility in metres).
+Stage 1 kept **29 stations**, 1 Jan 2009 – 24 May 2019, 2.83M rows. Audit did **not** confirm Table 5 as a cross-station lag error — inspect `outputs/audit/audit_units.json`.
+
+## Run order (do not skip Stage 1)
 
 Audit is a gate. Confirmed cross-station lag contamination → regenerate every table, figure, and SHAP result. Not confirmed → inspect `outputs/audit/audit_units.json` before editing the manuscript.
 

@@ -1,5 +1,6 @@
-# Client zip is too large for GitHub (458 MB; GitHub file limit is 100 MB)
+# Client zips are too large for GitHub (100 MB file limit)
 Weather-suaida-project.zip
+saudi-hourly-weather-data_Historical.zip
 
 # Unpublished manuscript + confidential reviewer files stay local
 submitted/

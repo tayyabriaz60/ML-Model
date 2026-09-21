@@ -24,27 +24,73 @@ from __future__ import annotations
 
 import json
 import os
+import zipfile
 import numpy as np
 import pandas as pd
 
 from . import config as C
 
 
+def _study_mask(dates: pd.Series) -> pd.Series:
+    start = pd.Timestamp(C.STUDY_START)
+    end = pd.Timestamp(C.STUDY_END) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    return (dates >= start) & (dates <= end)
+
+
+def _read_csv_chunks(source, **kwargs) -> pd.DataFrame:
+    """Chunked read, keep the manuscript date window, rename headers."""
+    frames = []
+    n_in = 0
+    for chunk in pd.read_csv(source, usecols=list(C.RAW_USECOLS),
+                             chunksize=250_000, low_memory=False, **kwargs):
+        n_in += len(chunk)
+        if C.COLUMN_MAP:
+            chunk = chunk.rename(columns=C.COLUMN_MAP)
+        chunk[C.COL_TIME] = pd.to_datetime(chunk[C.COL_TIME], errors="coerce")
+        chunk = chunk.loc[_study_mask(chunk[C.COL_TIME])]
+        if len(chunk):
+            frames.append(chunk)
+    if not frames:
+        raise ValueError(
+            f"No rows in {C.STUDY_START}–{C.STUDY_END} after reading {n_in:,} rows."
+        )
+    df = pd.concat(frames, ignore_index=True)
+    print(f"  load_raw: {n_in:,} rows scanned, {len(df):,} kept in study window",
+          flush=True)
+    return df
+
+
+def _historical_member(zf: zipfile.ZipFile) -> str:
+    """Pick the raw KAPSARC export inside a zip; never the processed feature table."""
+    hits = [n for n in zf.namelist()
+            if n.replace("\\", "/").endswith("saudi-hourly-weather-data_Historical.csv")]
+    if not hits:
+        raise FileNotFoundError("saudi-hourly-weather-data_Historical.csv not in zip")
+    return hits[0]
+
+
 # --------------------------------------------------------------------------
 # Loading
 # --------------------------------------------------------------------------
 def load_raw(path: str | None = None) -> pd.DataFrame:
-    """Load the raw hourly export. Adjust the reader to the actual file type."""
+    """Load the raw hourly export (CSV, directory of CSVs, or the client zip)."""
     path = path or C.DATA_RAW
     if os.path.isdir(path):
-        frames = [pd.read_csv(os.path.join(path, f), low_memory=False)
-                  for f in sorted(os.listdir(path)) if f.endswith((".csv", ".gz"))]
-        df = pd.concat(frames, ignore_index=True)
-    else:
-        df = pd.read_csv(path, low_memory=False)
-    if C.COLUMN_MAP:
-        df = df.rename(columns=C.COLUMN_MAP)
-    return df
+        files = [os.path.join(path, f) for f in sorted(os.listdir(path))
+                 if f.endswith((".csv", ".gz"))
+                 and "subset" not in f.lower()
+                 and "sample" not in f.lower()
+                 and "processed" not in f.lower()]
+        if not files:
+            raise FileNotFoundError(f"No raw KAPSARC CSV under {path}")
+        return pd.concat([_read_csv_chunks(f) for f in files], ignore_index=True)
+    if str(path).lower().endswith(".zip"):
+        with zipfile.ZipFile(path) as zf:
+            member = _historical_member(zf)
+            print(f"  load_raw: zip member {member}", flush=True)
+            with zf.open(member) as fh:
+                return _read_csv_chunks(fh)
+    return _read_csv_chunks(path)
 
 
 def clean(df: pd.DataFrame) -> pd.DataFrame:
@@ -56,6 +102,14 @@ def clean(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df[C.COL_TIME] = pd.to_datetime(df[C.COL_TIME], errors="coerce", utc=True)
     df = df.dropna(subset=[C.COL_TIME, C.COL_STATION])
+    start = pd.Timestamp(C.STUDY_START, tz="UTC")
+    end = pd.Timestamp(C.STUDY_END, tz="UTC") + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+    df = df.loc[(df[C.COL_TIME] >= start) & (df[C.COL_TIME] <= end)]
+    counts = df.groupby(C.COL_STATION).size()
+    keep = counts[counts >= C.MIN_STATION_RECORDS].index
+    print(f"  clean: {len(df):,} rows, {counts.size} stations in window; "
+          f"keeping {len(keep)} with >={C.MIN_STATION_RECORDS} records", flush=True)
+    df = df[df[C.COL_STATION].isin(keep)].copy()
 
     for col in C.BASE_VARS:
         if col not in df.columns:

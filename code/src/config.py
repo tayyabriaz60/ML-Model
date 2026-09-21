@@ -31,13 +31,36 @@ for _p in (DATA_INTERIM, DATA_PROC, OUT, OUT_TABLES, OUT_FIGS, OUT_MODELS,
 
 SEED = 20260317
 
+# Manuscript window (Sections 3.x). Raw KAPSARC file starts 1946; do not
+# reindex the full archive or the hourly grid will not fit in memory.
+STUDY_START = "2009-01-01"
+STUDY_END = "2019-05-24"
+# Same floor the submitted preprocessor used (select_stations min_records=30000).
+# Applied AFTER the 2009–2019 cut so sparse 1940s-only sites never enter the grid.
+MIN_STATION_RECORDS = 30000
+
 # --------------------------------------------------------------------------
 # Column names as they appear in the KAPSARC hourly export
 # --------------------------------------------------------------------------
-COL_STATION = "STATION"          # <-- VERIFY against the raw file in Step 1
-COL_TIME = "DATE"                # <-- VERIFY
-# Rename raw headers -> names above. Fill after the first audit if needed.
-COLUMN_MAP: Dict[str, str] = {}
+COL_STATION = "STATION"
+COL_TIME = "DATE"
+# Headers in saudi-hourly-weather-data_Historical.csv
+COLUMN_MAP: Dict[str, str] = {
+    "STATION_NAME": COL_STATION,
+    "OBSERVATION_DATE": COL_TIME,
+}
+# Read only modelling columns from the 5 GB export.
+RAW_USECOLS: Tuple[str, ...] = (
+    "STATION_NAME",
+    "OBSERVATION_DATE",
+    "AIR_TEMPERATURE",
+    "AIR_TEMPERATURE_DEW_POINT",
+    "VISIBILITY_DISTANCE",
+    "ATMOSPHERIC_SEA_LEVEL_PRESSURE",
+    "WIND_SPEED_RATE",
+    "WIND_DIRECTION_ANGLE",
+    "SKY_CEILING_HEIGHT",
+)
 TARGETS: Dict[str, str] = {
     "temperature": "AIR_TEMPERATURE",
     "visibility": "VISIBILITY_DISTANCE",
@@ -52,7 +75,7 @@ PREDICTORS: List[str] = [
 BASE_VARS: List[str] = list(TARGETS.values()) + PREDICTORS
 
 # Sentinel codes documented in Section 3.3 of the submitted manuscript
-SENTINELS: Tuple[float, ...] = (9999.9, 99999.0, 999.0, 999.9, -9999.0)
+SENTINELS: Tuple[float, ...] = (9999.9, 99999.0, 999999.0, 999.0, 999.9, -9999.0)
 
 # Physically admissible ranges. Anything outside becomes NaN BEFORE imputation.
 # Reviewer 2 (basic reporting, bullet 3) asked for detail on missing handling;

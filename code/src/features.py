@@ -15,6 +15,15 @@ import numpy as np
 import pandas as pd
 
 from . import config as C
+import gc
+
+
+def _downcast_float32(df: pd.DataFrame) -> pd.DataFrame:
+    """Keep the ~2.6M-row feature frame in float32 so copies do not OOM."""
+    f64 = df.select_dtypes(include=["float64"]).columns
+    if len(f64):
+        df[f64] = df[f64].astype("float32")
+    return df
 
 
 # --------------------------------------------------------------------------
@@ -48,36 +57,43 @@ def add_rolling(df: pd.DataFrame, cols=None, windows=None) -> pd.DataFrame:
 
 def add_cyclical(df: pd.DataFrame) -> pd.DataFrame:
     t = df[C.COL_TIME]
-    out = df.copy()
-    out["hour"] = t.dt.hour
-    out["day_of_year"] = t.dt.dayofyear
-    out["month"] = t.dt.month
-    out["day_of_week"] = t.dt.dayofweek
-    out["year"] = t.dt.year
+    df["hour"] = t.dt.hour.astype("int16")
+    df["day_of_year"] = t.dt.dayofyear.astype("int16")
+    df["month"] = t.dt.month.astype("int8")
+    df["day_of_week"] = t.dt.dayofweek.astype("int8")
+    df["year"] = t.dt.year.astype("int16")
     for name, period in (("hour", 24), ("day_of_year", 365.25), ("month", 12)):
-        ang = 2 * np.pi * out[name] / period
-        out[f"{name}_sin"] = np.sin(ang)
-        out[f"{name}_cos"] = np.cos(ang)
-    return out
+        ang = 2 * np.pi * df[name].astype("float32") / period
+        df[f"{name}_sin"] = np.sin(ang).astype("float32")
+        df[f"{name}_cos"] = np.cos(ang).astype("float32")
+    return df
 
 
 def add_interactions(df: pd.DataFrame) -> pd.DataFrame:
-    out = df.copy()
-    out["temp_dewpoint_spread"] = (out["AIR_TEMPERATURE"]
-                                   - out["AIR_TEMPERATURE_DEW_POINT"])
-    rad = np.deg2rad(out["WIND_DIRECTION_ANGLE"])
-    out["wind_u"] = -out["WIND_SPEED_RATE"] * np.sin(rad)
-    out["wind_v"] = -out["WIND_SPEED_RATE"] * np.cos(rad)
+    df["temp_dewpoint_spread"] = (
+        df["AIR_TEMPERATURE"] - df["AIR_TEMPERATURE_DEW_POINT"]
+    ).astype("float32")
+    rad = np.deg2rad(df["WIND_DIRECTION_ANGLE"].to_numpy(dtype="float32"))
+    ws = df["WIND_SPEED_RATE"].to_numpy(dtype="float32")
+    df["wind_u"] = (-ws * np.sin(rad)).astype("float32")
+    df["wind_v"] = (-ws * np.cos(rad)).astype("float32")
     # Relative humidity via Magnus formula - a physically meaningful predictor
     # for fog that the submitted feature set lacked.
     a, b = 17.625, 243.04
-    T, Td = out["AIR_TEMPERATURE"], out["AIR_TEMPERATURE_DEW_POINT"]
-    out["relative_humidity"] = 100 * np.exp(a * Td / (b + Td) - a * T / (b + T))
-    g = out.groupby(C.COL_STATION)
-    out["pressure_tendency_3h"] = (out["ATMOSPHERIC_SEA_LEVEL_PRESSURE"]
-                                   - g["ATMOSPHERIC_SEA_LEVEL_PRESSURE"].shift(3))
-    out["temp_tendency_3h"] = out["AIR_TEMPERATURE"] - g["AIR_TEMPERATURE"].shift(3)
-    return out
+    T = df["AIR_TEMPERATURE"].to_numpy(dtype="float32")
+    Td = df["AIR_TEMPERATURE_DEW_POINT"].to_numpy(dtype="float32")
+    df["relative_humidity"] = (
+        100 * np.exp(a * Td / (b + Td) - a * T / (b + T))
+    ).astype("float32")
+    g = df.groupby(C.COL_STATION)
+    df["pressure_tendency_3h"] = (
+        df["ATMOSPHERIC_SEA_LEVEL_PRESSURE"]
+        - g["ATMOSPHERIC_SEA_LEVEL_PRESSURE"].shift(3)
+    ).astype("float32")
+    df["temp_tendency_3h"] = (
+        df["AIR_TEMPERATURE"] - g["AIR_TEMPERATURE"].shift(3)
+    ).astype("float32")
+    return df
 
 
 def add_targets(df: pd.DataFrame, horizons=None) -> pd.DataFrame:
@@ -98,8 +114,14 @@ def add_targets(df: pd.DataFrame, horizons=None) -> pd.DataFrame:
 def build_features(df: pd.DataFrame, vis_short_only: bool = False) -> pd.DataFrame:
     """Full feature frame. `vis_short_only` produces the restricted visibility
     feature set for Reviewer 1's experimental-design point 2."""
+    df = _downcast_float32(df)
     out = add_lags(df)
+    del df
+    gc.collect()
+    out = _downcast_float32(out)
     out = add_rolling(out)
+    out = _downcast_float32(out)
+    gc.collect()
     if vis_short_only:
         drop = [c for c in out.columns
                 if c.startswith("VISIBILITY_DISTANCE_lag_")
