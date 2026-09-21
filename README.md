@@ -1,0 +1,53 @@
+# T5.R1 — explainable meteorological forecast revision
+
+Working tree for the major revision of *Explainable short-horizon hourly meteorological forecasting models for temperature, visibility, and atmospheric pressure using SHAP, LIME, and attention.*
+
+Client contract: **ML Model Test and Enhancement T5.R1**, 5 working days, four deliverables. Follow `briefing/revision_run_sheet.html` and `briefing/REVISION_WORK_ORDER.pdf` (PDF is local-only).
+
+## Deliverables
+
+| # | File | Source |
+|---|---|---|
+| 1 | `code/` rerun | `code/run_all.py` |
+| 2 | `manuscript_marked_up.docx` | numbers from `outputs/manuscript_numbers.json` into `[[KEY]]` placeholders |
+| 3 | `manuscript_clean.docx` | same, clean copy |
+| 4 | `response_letter.docx` | `letter/response_letter.docx` after the numbers export |
+
+Do not type numbers by hand. Stage 9 writes `manuscript_numbers.json`; the letter and manuscript substitute `[[KEY]]`.
+
+## What this repo contains
+
+```
+briefing/     run-sheet + engineering rules (PDFs stay on disk, not on GitHub)
+code/         revision pipeline (run_all.py + src/)
+data/         README only; raw CSVs are local
+notes/        problem statement + changelog
+```
+
+The 458 MB `Weather-suaida-project.zip` is **not** this paper’s pipeline. It is a QC/anomaly project on the same KAPSARC source. Use it only as a data pointer. Do not run its stage-1…8 QC scripts for this revision.
+
+## Data status
+
+Paper claims: **29 stations**, 1 Jan 2009 – 24 May 2019, **2,775,657** complete hourly rows.
+
+What the zip actually contains as usable CSV: **4 stations** (Abha, Al Ahsa, Dammam, Gassim), Jan 2018 – May 2019, **63,266** rows. Visibility in that extract is **0.0–0.9** (not metres). It cannot reproduce submitted Table 5 and must not be treated as production input until units and coverage are resolved.
+
+## Run order (do not skip Stage 1)
+
+```bash
+cd code
+pip install -r requirements.txt
+set KAPSARC_RAW=..\data\raw
+set N_TRIALS=24
+python run_all.py --stage audit
+```
+
+Audit is a gate. Confirmed cross-station lag contamination → regenerate every table, figure, and SHAP result. Not confirmed → inspect `outputs/audit/audit_units.json` before editing the manuscript.
+
+## Hard rules
+
+- Every lag / rolling / persistence operator is `groupby(station)`.
+- Metrics in native units (°C, m, hPa). Do not inverse-transform already-native `y`.
+- Identical `N_TRIALS` for trees and sequence models.
+- Withdraw XAI dashboard and temporal saliency; do not regenerate them.
+- GitHub copy is public: manuscript PDF, reviewer comments, and response letter are gitignored.

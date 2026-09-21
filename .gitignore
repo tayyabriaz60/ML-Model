@@ -1,0 +1,25 @@
+# Client zip is too large for GitHub (458 MB; GitHub file limit is 100 MB)
+Weather-suaida-project.zip
+
+# Unpublished manuscript + confidential reviewer files stay local
+submitted/
+letter/
+briefing/*.pdf
+
+# Raw extracts (also stay local; units are not yet validated)
+data/raw/*.csv
+data/raw/*.json
+
+# Pipeline runtime
+**/__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+code/outputs/
+code/data/interim/
+code/data/processed/
+code/data/raw/
+
+.cursor/
+notes/_data_loader_peek.py
+*.log

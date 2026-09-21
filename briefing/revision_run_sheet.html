@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revision Run Sheet</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Zilla+Slab:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#eef1f2; --surface:#ffffff; --surface-2:#f6f8f8;
+  --ink:#10202e; --ink-2:#3d5566; --muted:#6a8091;
+  --rule:#ccd7dc; --rule-2:#dde5e8;
+  --signal:#a8322a; --signal-bg:#fbeeed;
+  --done:#2c6a51; --done-bg:#e8f1ed;
+  --focus:#1f6f8b;
+  --shadow:0 1px 0 rgba(16,32,46,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0d1519; --surface:#131e24; --surface-2:#18242b;
+    --ink:#e3ecef; --ink-2:#a8bdc7; --muted:#7a929e;
+    --rule:#2a3c45; --rule-2:#223038;
+    --signal:#e98b80; --signal-bg:#2c1d1c;
+    --done:#7fc4a3; --done-bg:#16291f;
+    --focus:#69b8d4;
+    --shadow:none;
+  }
+  :root:not([data-theme="light"]) .pip.full,
+  :root:not([data-theme="light"]) .stage.complete .stage-num{color:#0d1519}
+}
+:root[data-theme="dark"]{
+  --paper:#0d1519; --surface:#131e24; --surface-2:#18242b;
+  --ink:#e3ecef; --ink-2:#a8bdc7; --muted:#7a929e;
+  --rule:#2a3c45; --rule-2:#223038;
+  --signal:#e98b80; --signal-bg:#2c1d1c;
+  --done:#7fc4a3; --done-bg:#16291f;
+  --focus:#69b8d4;
+  --shadow:none;
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55;
+}
+code,kbd,.mono{font-family:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+
+/* ---------- masthead ---------- */
+.masthead{
+  position:sticky; top:0; z-index:20;
+  background:var(--surface); border-bottom:1px solid var(--rule);
+  box-shadow:var(--shadow);
+}
+.masthead-inner{
+  max-width:1180px; margin:0 auto; padding:14px 24px;
+  display:flex; align-items:center; gap:22px; flex-wrap:wrap;
+}
+.wordmark{
+  font-family:"Zilla Slab",Georgia,serif; font-weight:600;
+  font-size:19px; letter-spacing:-.01em; margin:0; white-space:nowrap;
+}
+.wordmark span{color:var(--muted); font-weight:500}
+.deadline{
+  font-size:12.5px; color:var(--ink-2); border-left:1px solid var(--rule);
+  padding-left:22px; max-width:30ch;
+}
+.meter{flex:1 1 220px; min-width:180px}
+.meter-head{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:12.5px; color:var(--ink-2); margin-bottom:5px;
+}
+.meter-count{font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--ink)}
+.meter-track{height:6px; background:var(--rule-2); border-radius:3px; overflow:hidden}
+.meter-fill{height:100%; width:0%; background:var(--done); transition:width .25s ease}
+.tools{display:flex; gap:8px}
+button{
+  font:inherit; font-size:13px; color:var(--ink-2);
+  background:var(--surface-2); border:1px solid var(--rule);
+  border-radius:5px; padding:6px 11px; cursor:pointer;
+}
+button:hover{color:var(--ink); border-color:var(--muted)}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{
+  outline:2px solid var(--focus); outline-offset:2px;
+}
+
+/* ---------- layout ---------- */
+.wrap{max-width:1180px; margin:0 auto; padding:26px 24px 80px; display:flex; gap:34px; align-items:flex-start}
+.rail{
+  flex:0 0 232px; position:sticky; top:calc(var(--mast-h,86px) + 14px);
+  max-height:calc(100vh - var(--mast-h,86px) - 40px); overflow-y:auto;
+}
+.rail h2,.panel-group-head{
+  font-family:"Zilla Slab",Georgia,serif; font-size:13px; font-weight:600;
+  color:var(--muted); margin:0 0 10px; letter-spacing:.01em;
+}
+.rail ol{list-style:none; margin:0; padding:0}
+.rail li{margin:0}
+.rail a{
+  display:flex; align-items:center; gap:9px;
+  padding:6px 8px; border-radius:5px; text-decoration:none;
+  color:var(--ink-2); font-size:13.5px; border-left:2px solid transparent;
+}
+.rail a:hover{background:var(--surface-2); color:var(--ink)}
+.rail a.current{border-left-color:var(--focus); color:var(--ink); background:var(--surface-2)}
+.pip{
+  flex:0 0 17px; height:17px; border-radius:50%;
+  border:1.5px solid var(--rule); display:grid; place-items:center;
+  font-size:9.5px; font-family:"IBM Plex Mono",monospace; color:var(--muted);
+}
+.pip.part{border-color:var(--focus); color:var(--focus)}
+.pip.full{background:var(--done); border-color:var(--done); color:var(--surface)}
+:root[data-theme="dark"] .pip.full{color:#0d1519}
+.rail .gate{margin-left:auto; color:var(--signal); font-size:10px; font-family:"IBM Plex Mono",monospace}
+.main{flex:1 1 auto; min-width:0}
+
+/* ---------- intro ---------- */
+.intro{
+  background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+  padding:22px 24px; margin-bottom:26px;
+}
+.intro h1{
+  font-family:"Zilla Slab",Georgia,serif; font-weight:600;
+  font-size:26px; line-height:1.2; margin:0 0 10px; letter-spacing:-.015em;
+}
+.intro p{margin:0 0 12px; max-width:72ch; color:var(--ink-2)}
+.intro p:last-child{margin-bottom:0}
+.intro strong{color:var(--ink); font-weight:600}
+
+.deliverables{
+  list-style:none; margin:16px 0 0; padding:0;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:1px;
+  background:var(--rule-2); border:1px solid var(--rule-2); border-radius:6px; overflow:hidden;
+}
+.deliverables li{background:var(--surface-2); padding:12px 14px}
+.deliverables .n{
+  font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); display:block; margin-bottom:3px;
+}
+.deliverables .t{display:block; font-weight:500; font-size:14px; margin-bottom:2px}
+.deliverables .f{display:block; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); word-break:break-all}
+
+/* ---------- stage ---------- */
+.stage{
+  background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+  margin-bottom:16px; overflow:hidden;
+  scroll-margin-top:calc(var(--mast-h,86px) + 14px);
+}
+.stage.gate{border-color:var(--signal)}
+.stage-head{
+  display:flex; align-items:flex-start; gap:14px;
+  padding:16px 20px; cursor:pointer; user-select:none;
+  border-bottom:1px solid transparent;
+}
+.stage-head:hover{background:var(--surface-2)}
+.stage.open .stage-head{border-bottom-color:var(--rule-2)}
+.stage-num{
+  flex:0 0 30px; height:30px; border-radius:50%;
+  background:var(--surface-2); border:1px solid var(--rule);
+  display:grid; place-items:center; margin-top:1px;
+  font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--ink-2);
+}
+.stage.complete .stage-num{background:var(--done); border-color:var(--done); color:var(--surface)}
+:root[data-theme="dark"] .stage.complete .stage-num{color:#0d1519}
+.stage.gate .stage-num{border-color:var(--signal); color:var(--signal)}
+.stage.gate.complete .stage-num{background:var(--done); border-color:var(--done)}
+.stage-title{flex:1 1 auto; min-width:0}
+.stage-title h3{
+  font-family:"Zilla Slab",Georgia,serif; font-weight:600;
+  font-size:17.5px; margin:0 0 3px; letter-spacing:-.005em;
+}
+.stage-sub{font-size:13px; color:var(--muted); margin:0}
+.stage-meta{display:flex; align-items:center; gap:10px; flex:0 0 auto; padding-top:4px}
+.tally{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--muted)}
+.chev{width:11px; height:11px; border-right:1.5px solid var(--muted); border-bottom:1.5px solid var(--muted);
+  transform:rotate(45deg); transition:transform .18s ease; margin-bottom:3px}
+.stage.open .chev{transform:rotate(225deg); margin-bottom:0; margin-top:3px}
+.stage-body{display:none; padding:4px 20px 20px}
+.stage.open .stage-body{display:block}
+
+.gate-note{
+  background:var(--signal-bg); border-left:2px solid var(--signal);
+  padding:11px 14px; margin:12px 0 16px; font-size:13.5px; color:var(--ink-2);
+  border-radius:0 5px 5px 0;
+}
+.gate-note b{color:var(--signal); font-weight:600}
+.brief{margin:12px 0 16px; color:var(--ink-2); max-width:74ch}
+.brief p{margin:0 0 9px}
+.brief p:last-child{margin-bottom:0}
+.brief b{color:var(--ink); font-weight:600}
+pre{
+  background:var(--surface-2); border:1px solid var(--rule-2); border-radius:5px;
+  padding:11px 13px; margin:0 0 16px; overflow-x:auto;
+  font-family:"IBM Plex Mono",monospace; font-size:12.5px; line-height:1.6; color:var(--ink-2);
+}
+
+/* ---------- tasks ---------- */
+.tasks{list-style:none; margin:0 0 4px; padding:0}
+.tasks li{border-top:1px solid var(--rule-2)}
+.tasks li:first-child{border-top:none}
+.task{display:flex; gap:11px; align-items:flex-start; padding:9px 2px; cursor:pointer}
+.task input{
+  flex:0 0 auto; margin:2px 0 0; width:16px; height:16px;
+  accent-color:var(--done); cursor:pointer;
+}
+.task span{flex:1 1 auto; font-size:14px; line-height:1.5}
+.task input:checked + span{color:var(--muted); text-decoration:line-through; text-decoration-color:var(--rule)}
+.task code{
+  background:var(--surface-2); border:1px solid var(--rule-2);
+  padding:.5px 4px; border-radius:3px; font-size:12px;
+}
+
+.donewhen{
+  margin-top:14px; padding-top:13px; border-top:1px solid var(--rule-2);
+  font-size:13.5px; color:var(--ink-2);
+}
+.donewhen b{font-weight:600; color:var(--ink)}
+.answers{margin-top:8px; font-size:12px; color:var(--muted); font-family:"IBM Plex Mono",monospace}
+
+.notes{margin-top:16px}
+.notes label{display:block; font-size:12.5px; color:var(--muted); margin-bottom:5px}
+.notes textarea{
+  width:100%; min-height:62px; resize:vertical;
+  font:inherit; font-size:13.5px; color:var(--ink);
+  background:var(--surface-2); border:1px solid var(--rule); border-radius:5px;
+  padding:9px 11px; line-height:1.5;
+}
+.notes textarea::placeholder{color:var(--muted)}
+
+/* ---------- escalate ---------- */
+/* ---------- coverage ---------- */
+.coverage{
+  background:var(--surface); border:1px solid var(--rule); border-radius:8px;
+  padding:20px 22px; margin-top:26px;
+}
+.coverage h2{
+  font-family:"Zilla Slab",Georgia,serif; font-size:17px; font-weight:600; margin:0 0 6px;
+}
+.coverage > p{margin:0 0 16px; color:var(--ink-2); font-size:13.5px; max-width:74ch}
+.cov-scroll{overflow-x:auto}
+.coverage table{border-collapse:collapse; width:100%; font-size:13px; min-width:520px}
+.coverage th{
+  text-align:left; font-weight:600; font-size:12px; color:var(--muted);
+  padding:0 12px 7px 0; border-bottom:1px solid var(--rule);
+}
+.coverage td{padding:7px 12px 7px 0; border-bottom:1px solid var(--rule-2); vertical-align:top; color:var(--ink-2)}
+.coverage tr:last-child td{border-bottom:none}
+.cov-id{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink); white-space:nowrap}
+.cov-where{color:var(--muted)}
+.cov-stage{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink); white-space:nowrap; text-align:right}
+
+.escalate{
+  background:var(--surface); border:1px solid var(--signal); border-radius:8px;
+  padding:20px 22px; margin-top:26px;
+}
+.escalate h2{
+  font-family:"Zilla Slab",Georgia,serif; font-size:17px; font-weight:600;
+  margin:0 0 6px; color:var(--signal);
+}
+.escalate p{margin:0 0 14px; color:var(--ink-2); font-size:13.5px; max-width:74ch}
+.escalate ul{margin:0; padding-left:19px; color:var(--ink-2); font-size:13.5px}
+.escalate li{margin-bottom:7px}
+.escalate li:last-child{margin-bottom:0}
+.escalate b{color:var(--ink); font-weight:600}
+
+.status{
+  position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(14px);
+  background:var(--ink); color:var(--paper); font-size:13px;
+  padding:9px 16px; border-radius:6px; opacity:0; pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease; z-index:40; max-width:88vw; text-align:center;
+}
+.status.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+@media (max-width:880px){
+  .wrap{flex-direction:column; align-items:stretch; gap:22px; padding:20px 16px 60px}
+  .main,.rail{width:100%; max-width:100%; min-width:0}
+  .intro h1{font-size:22px}
+  .rail{position:static; flex:1 1 auto; width:100%; max-height:none}
+  .rail ol{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:2px}
+  .deadline{border-left:none; padding-left:0; max-width:none}
+  .masthead-inner{padding:12px 16px; gap:14px}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important}
+}
+@media print{
+  .masthead,.rail,.tools,.chev{display:none}
+  .wrap{display:block; padding:0}
+  .stage-body{display:block !important}
+  .stage{break-inside:avoid; border-color:#999}
+  body{background:#fff}
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1 class="wordmark">Revision run sheet <span>/ manuscript [ID withheld]</span></h1>
+    <p class="deadline">Five working days from the agreed start. Sequence the work as you see fit.</p>
+    <div class="meter">
+      <div class="meter-head"><span>Overall</span><span class="meter-count" id="count">0 / 0</span></div>
+      <div class="meter-track"><div class="meter-fill" id="fill"></div></div>
+    </div>
+    <div class="tools">
+      <button id="expand" type="button">Expand all</button>
+      <button id="report" type="button">Copy status report</button>
+      <button id="theme" type="button">Dark</button>
+      <button id="reset" type="button">Reset</button>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="rail" aria-label="Stages">
+    <h2>Stages</h2>
+    <ol id="rail"></ol>
+  </nav>
+
+  <main class="main">
+    <section class="intro">
+      <h1>Nine stages, four deliverables, three points where the work stops for the author.</h1>
+      <p>Every stage below carries the commands to run, the tasks to tick, and the condition that counts as done. Tick as you go — progress is saved in this browser, so you can close the file and come back to it.</p>
+      <p><strong>Two rules hold throughout.</strong> Never type a number into the manuscript or the letter; add it to <code>export_numbers.collect()</code> and reference it as <code>[[KEY]]</code>. Never edit the generated files; edit <code>manuscript_master.md</code> and rebuild.</p>
+      <ul class="deliverables">
+        <li><span class="n">Deliverable 1</span><span class="t">Corrected codebase, rerun</span><span class="f">code/</span></li>
+        <li><span class="n">Deliverable 2</span><span class="t">Marked-up manuscript</span><span class="f">manuscript_marked_up.docx</span></li>
+        <li><span class="n">Deliverable 3</span><span class="t">Clean manuscript</span><span class="f">manuscript_clean.docx</span></li>
+        <li><span class="n">Deliverable 4</span><span class="t">Response letter</span><span class="f">response_letter.docx</span></li>
+      </ul>
+    </section>
+
+    <div id="stages"></div>
+
+    <section class="coverage">
+      <h2>All <span id="cov-total">36</span> reviewer points, and where each is answered</h2>
+      <p>Reference, not a checklist — every point here is ticked by one of the stages above. The right-hand column says which. If you finish a stage and a point mapped to it still looks unaddressed in the built documents, that is worth raising before packaging.</p>
+      <div class="cov-scroll">
+        <table>
+          <thead><tr><th>Point</th><th>What the reviewer raised</th><th>Answered in</th><th>Stage</th></tr></thead>
+          <tbody id="cov-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="escalate">
+      <h2>When to escalate rather than proceed</h2>
+      <p>Report to the author promptly, not at the end. Each of these is a case where continuing produces work that has to be redone.</p>
+      <ul>
+        <li><b>The audit does not reproduce the submitted numbers.</b> The diagnosis is wrong, and §4.1, §6.1 and the letter's opening all need rewriting. Five days no longer holds.</li>
+        <li><b>The leakage assertion fails after the rebuild.</b> The defect is deeper than station grouping and everything downstream is unsafe.</li>
+        <li><b>Corrected results are materially weaker than the submitted ones.</b> Expected and acceptable — but the claims get rewritten, not the numbers.</li>
+        <li><b>A central claim no longer holds once the numbers land.</b> Better to extend than to ship a claim nobody checked.</li>
+        <li><b>The attention profile contradicts the autocorrelation structure.</b> A substantive finding about the model, not a plotting problem.</li>
+        <li><b>Fog events are too few for stable regime SHAP.</b> Report sample sizes and say so in the text rather than presenting a thin result confidently.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<div class="status" id="status" role="status" aria-live="polite"></div>
+
+<script>
+const STAGES = [
+  {
+    id:"prep", n:"0", title:"Before you start", sub:"Preconditions — none difficult, each expensive to discover late",
+    tasks:[
+      "Dependencies installed and raw data readable",
+      "Column names reconciled against <code>config.COLUMN_MAP</code>",
+      "GPU concurrency confirmed — you can actually launch as many jobs as your plan assumes",
+      "Read the three removal notes in <code>manuscript_master.md</code> (§1.3, §5.3, §7.5) and the WITHDRAWN block in <code>src/figures.py</code>",
+      "<code>grep -rni \"salien\\|dashboard\" src/ run_all.py</code> — every hit inside a comment or docstring, none executable",
+      "Agreed with the author how the three checkpoints will be handled"
+    ],
+    pre:"pip install -r requirements.txt\nexport KAPSARC_RAW=/path/to/raw\npython -c \"import torch; print(torch.cuda.device_count())\"",
+    brief:"<p>The hyperparameter search is the long pole: nine independent jobs of roughly eight GPU-hours each. Sequentially on one GPU that is about three days on its own, and everything downstream waits for it. Plan your compute before the clock starts.</p>",
+    done:"All six boxes ticked before the deadline clock starts."
+  },
+  {
+    id:"audit", n:"1", title:"Audit", sub:"Determines whether the rest of the plan is correct", gate:true,
+    gateText:"<b>Checkpoint.</b> Work stops here until the author confirms the verdict.",
+    brief:"<p><code>data.audit_station_grouping()</code> computes the 1 h persistence baseline twice per target: once with <code>groupby(station)</code>, once on the timestamp-sorted interleaved frame that reproduces the submitted pipeline. Compare both against submitted Table 5.</p><p><b>Expected:</b> the ungrouped variant reproduces roughly RMSE 0.8864, MAE 0.0568, R² −0.5144 for temperature, while the grouped variant gives R² above 0.95.</p><p><b>If it does not reproduce, stop and escalate.</b> The cause is something else and the draft's diagnosis is wrong.</p>",
+    pre:"python run_all.py --stage audit\ncat outputs/audit/audit_all_targets.json",
+    tasks:[
+      "Audit stage run, <code>audit_all_targets.json</code> written",
+      "Grouped and ungrouped baselines compared against submitted Table 5",
+      "Verdict recorded with the supporting numbers",
+      "Author has responded to the checkpoint"
+    ],
+    done:"Verdict recorded with supporting numbers and the checkpoint cleared.",
+    answers:"R2-4 · basis for R1-ED5"
+  },
+  {
+    id:"features", n:"2", title:"Feature rebuild", sub:"Station-grouped construction and the leakage test", gate:true,
+    gateText:"<b>Checkpoint.</b> The author authorises the search before you spend the compute.",
+    brief:"<p>Station-grouped lags, rolling statistics computed on <code>.shift(1)</code>, cyclical encodings, plus the new derived features: relative humidity, and pressure and temperature tendencies over 3 h.</p><p><b>The assertion is necessary but not sufficient, so check by hand too.</b> Pick three station–timestamp pairs at random and confirm <code>lag_1</code> equals the target at that same station one hour earlier. Not the previous row. The same station. This is the check that would have caught the original defect.</p>",
+    pre:"python run_all.py --stage features\npython -c \"from src.features import assert_no_cross_station_leakage; assert_no_cross_station_leakage()\"",
+    tasks:[
+      "Features rebuilt with station grouping",
+      "Leakage assertion passes",
+      "Three manual spot-checks pass",
+      "<code>correlation_report()</code>, <code>vif_report()</code>, <code>autocorrelation_profile()</code> written",
+      "Author has authorised the search"
+    ],
+    done:"Assertion passes, three manual spot-checks pass, diagnostics written, checkpoint cleared.",
+    answers:"R1-ED1 · R1-ED5 · R2-4"
+  },
+  {
+    id:"tune", n:"3", title:"Hyperparameter search", sub:"Nine independent jobs; the equal budget is the point",
+    brief:"<p>Three architectures × three targets over <code>DL_SEARCH_SPACE</code>, selected on validation RMSE at the 1 h horizon. The tree search runs alongside on CPU and finishes far sooner.</p><p><b>Set the trial count once, for every family.</b> Reviewer 2's objection was that the sequence models were tuned less than the trees and then reported as inferior. A reduced budget applied to everyone answers that completely; trees at 40 and sequence models at 24 re-creates the exact criticism. The code raises an error below 12, where the claim stops meaning anything.</p><p>The value written to <code>run_meta.json</code> reaches both documents through <code>[[N_TRIALS]]</code>, so the text states the budget actually spent.</p>",
+    pre:"export N_TRIALS=24     # or 40 — whatever your compute supports\npython run_all.py --stage tune --parallel 9",
+    tasks:[
+      "<code>N_TRIALS</code> set once and applied to every family",
+      "Nine searches launched — confirmed running and logging before walking away",
+      "All searches complete",
+      "Selected configurations sanity-checked; any sitting at a search-range edge noted for Supplementary Table S2",
+      "<code>n_trials</code> present in <code>outputs/run_meta.json</code>"
+    ],
+    done:"All nine searches complete, configurations recorded, trial count in run_meta.json.",
+    answers:"R2-2"
+  },
+  {
+    id:"train", n:"4", title:"Training and evaluation", sub:"All horizons, full data, native units",
+    brief:"<p>All model families, all three targets, horizons 1–6. Full training set, no subsample. Chronological split with the global cut dates. Then <code>per_station_metrics()</code> across all 29 stations.</p><p><b>Check three things before believing any of it.</b> Persistence R² above 0.95 for temperature at 1 h — if not, the feature rebuild did not take effect. Metrics in native units on observed targets only. And the margin over persistence for pressure at 1 h should be small: the draft describes pressure skill as modest, so a large gap means the text must change.</p>",
+    pre:"python run_all.py --stage train",
+    tasks:[
+      "All families trained across horizons 1–6 on the full training set",
+      "Persistence R² above 0.95 for temperature at 1 h",
+      "Metrics in native units (°C, m, hPa), observed targets only, imputed rows excluded",
+      "Pressure margin over persistence checked against what the draft claims",
+      "Per-station metrics written for all 29 stations"
+    ],
+    done:"All horizons trained, native-unit metrics and skill scores produced, the three checks pass or the discrepancy is recorded.",
+    answers:"R1-ED3 · R1-BR8 · R2-1 · R2-3 · R2-7 · R2-8"
+  },
+  {
+    id:"explain", n:"5", title:"Explainability", sub:"Keep attention and perturbation importance distinct",
+    brief:"<p>SHAP global and signed, top-<i>k</i> coverage, LIME aggregated over 200 stratified instances, attention over positions, perturbation importance over features.</p><p><b>These two are different quantities and were conflated in the submitted figures.</b> <code>attention_weights()</code> is a distribution over input positions (Fig. 4); <code>perturbation_importance()</code> is a distribution over features (Fig. 5). Only perturbation importance enters the cross-method comparison, because only it shares a vocabulary with SHAP and LIME.</p><p>Attention is checked against the empirical autocorrelation function instead (Fig. 6) — independent of the model, so a match is evidence rather than two attribution methods agreeing with each other. <b>If the profile departs sharply from the autocorrelation structure, stop and report it.</b></p>",
+    pre:"python run_all.py --stage explain",
+    tasks:[
+      "SHAP global, signed and top-<i>k</i> coverage written",
+      "LIME aggregated over 200 stratified instances",
+      "SHAP sample size recorded — it goes into the figure captions",
+      "Attention and perturbation importance kept as separate objects",
+      "Attention profile checked against the autocorrelation structure"
+    ],
+    done:"All four outputs written with recorded sample sizes, and the two attention quantities kept separate.",
+    answers:"R1-BR5 · R1-V1 · R1-V2 · R2-6"
+  },
+  {
+    id:"agree", n:"6", title:"Cross-method agreement", sub:"Measure it, then make the prose match",
+    brief:"<p><code>cross_method_agreement()</code> computes Jaccard@{5,10,15}, Spearman over shared support, and RBO for every method pair. <code>agreement_divergence_table()</code> produces the consensus / partial / method-specific classification.</p><p><b>Read the numbers before writing about them.</b> The draft says agreement is strong for the dominant persistence term and weaker in the tail. If the measured values contradict that, rewrite §5.4 and the matching letter response.</p><p>The whole point of this stage is that the submitted version asserted \"&gt;0.90 agreement\" without ever computing it. Do not repeat that error in the opposite direction by computing a number and leaving prose standing that disagrees with it.</p>",
+    tasks:[
+      "Agreement statistics computed per target and horizon",
+      "Divergence table produced",
+      "<code>AGREE_*</code> placeholders resolve",
+      "§5.4 prose verified against the actual measured values"
+    ],
+    done:"agreement.json written per target × horizon, placeholders resolve, prose matches the measurements.",
+    answers:"R1-V4 · R2-5"
+  },
+  {
+    id:"extremes", n:"7", title:"Extremes, regimes and ablations", sub:"Absolute definitions, one source per number, null results reported",
+    brief:"<p>Fog is absolute horizontal visibility below 1 km. Extreme heat is a station- and day-of-year-window percentile with persistence of at least three days; subsets meeting the percentile but not the duration are labelled \"extreme high temperature\", never \"heatwave\".</p><p><b>Check event counts before proceeding.</b> If fog episodes are too few for stable regime SHAP, pool across stations and report the sample size. If still thin, report the dense-fog subset descriptively and say so.</p><p><code>regime_shap_table()</code> is the single source shared by Table 17 and Fig. 8 — the structural fix for the three-values defect. Verify the value is identical in both, because they read the same object.</p><p><b>Report null results.</b> A non-significant difference for pressure at 1 h is the honest answer to R2-8, not a problem to be solved.</p>",
+    pre:"python run_all.py --stage ablations",
+    tasks:[
+      "Fog defined by the absolute 1 km criterion; event counts checked",
+      "Extreme heat defined with 3-day persistence; short episodes labelled correctly",
+      "Normal-class composition reported",
+      "Regime table and figure verified as reading one source with identical values",
+      "Five ablations complete — or four plus the documented §6.4 caveat if the sequence-input ablation was run on temperature alone",
+      "Block bootstrap CIs (1000 resamples, 168 h blocks) computed",
+      "Diebold–Mariano tests with Newey-West and HLN, null results included"
+    ],
+    done:"Extremes defined by absolute criteria, regime table and figure sharing one source, ablations complete, CIs and tests written.",
+    answers:"R1-ED1 · R1-ED2 · R1-ED3 · R1-ED4 · R1-ED7 · R1-ED8 · R1-V3 · R2-1 · R2-7 · R2-8"
+  },
+  {
+    id:"build", n:"8", title:"Build the documents and verify every number", sub:"The stage where the deliverables become correct or do not", gate:true,
+    gateText:"<b>Checkpoint.</b> Send the discrepancy list and wait. Flagging is your job; deciding is the author's.",
+    brief:"<p><b>A substituted value can make a sentence false without making it ungrammatical.</b> \"The model substantially outperforms persistence\" is fine at a skill score of 0.31 and false at 0.03. No script detects this. Only reading does.</p><p>Work through every <code>[[KEY]]</code> in the master files and read the whole sentence around it. Ask whether the claim still holds at that value. Compile a list of every sentence that does not, with the value that broke it, and send it to the author.</p><p><b>Watch particularly for:</b> pressure skill, where §6.2.3 and §6.3.1 are written to accommodate a modest or null result; agreement values, where low tail agreement is expected but uniformly high agreement would need a different explanation; and any sentence using \"substantial\", \"marked\" or \"strong\" — each is a quantitative claim wearing a qualitative word.</p>",
+    pre:"python run_all.py --stage numbers\npython src/export_numbers.py --check      # must list zero unresolved keys\n\ncd manuscript && python build_manuscript.py\ncd ../letter && python build_letter.py\npandoc response_letter.md -o response_letter.docx",
+    tasks:[
+      "Numbers exported; <code>--check</code> lists zero unresolved keys",
+      "All three documents built",
+      "Zero unresolved placeholders in the manuscript, the clean copy and the letter",
+      "Every number-bearing sentence read against the value that landed in it",
+      "Discrepancy list compiled and sent to the author",
+      "Author's decisions applied to the master files, not the generated ones"
+    ],
+    done:"Zero unresolved placeholders, every number-bearing sentence read, discrepancy list resolved.",
+    answers:"R1-V3 · and the integrity of every other answer"
+  },
+  {
+    id:"package", n:"9", title:"Figures, references, supplementary, packaging", sub:"The checks that catch what earlier stages let through",
+    brief:"<p>Eleven figures at 300 dpi, colour-blind-safe palette, every axis labelled with units, every caption naming target, horizon, model and sample size. <b>Check the count</b> — twelve or thirteen files means a withdrawn generator has been reinstated.</p><p>For the additional references, search: <i>explainable AI numerical weather prediction</i>, <i>SHAP meteorological forecasting</i>, <i>interpretable machine learning atmospheric science</i>, <i>attention weather forecasting station data</i>. Candidate venues: <i>Artificial Intelligence for the Earth Systems</i>, <i>Environmental Data Science</i>, <i>Monthly Weather Review</i>, <i>Weather and Forecasting</i>, <i>Atmospheric Research</i>. <b>Read them before citing them.</b></p>",
+    pre:"grep -ni \"salien\\|dashboard\" manuscript_clean.md response_letter.md",
+    tasks:[
+      "Eleven figures at 300 dpi with complete captions — count verified as exactly eleven",
+      "4–6 atmospheric-XAI references added, and read",
+      "Supplementary Tables S1–S8 assembled",
+      "Terminology: \"visibility\" not \"visibility distance\"; ML, DL, SHAP, LIME, XAI, ARIMA expanded at first use",
+      "Ordering is temperature → visibility → pressure throughout",
+      "No encoding artefacts — grep for <code>ó</code>, <code>ñ</code>, stray <code>ý</code>",
+      "No duplicated blocks",
+      "Saliency and dashboard grep clean — only the §9 future-work statements and the letter's withdrawal explanations",
+      "Title on every file ends \"…and Attention\"",
+      "Figure cross-references in the body match the figure list",
+      "Every removed reference gone from the bibliography and the body",
+      "<code>[WITHHELD]</code> markers left intact",
+      "Both .docx files opened and the first three pages read as rendered",
+      "Handover note written"
+    ],
+    done:"All four deliverables packaged, every final check passed, handover note written.",
+    answers:"R1-BR3 · R1-BR4 · R1-BR6 · R1-BR7 · R2-9 · R2-11 · R2-12 · R2-13"
+  }
+  ,{
+    id:"verify", n:"10", title:"Verify what is already written", sub:"Seven points answered by prose in the drafts — confirm, do not rewrite",
+    brief:"<p>These seven reviewer points were answered by rewriting, and that rewriting is already in the supplied drafts. No pipeline output touches them. They are listed separately because a point nobody checks is indistinguishable from a point nobody answered — and a reviewer who finds an unfixed item from their own list reads it as the revision ignoring them.</p><p><b>Read, confirm, and move on.</b> If something here is wrong or missing, flag it rather than rewriting it yourself.</p>",
+    tasks:[
+      "<b>R1-BR1</b> — Introduction and Related Work read once through with no restatement between §1.1/§1.2 and §2.1–2.4",
+      "<b>R1-BR2</b> — Citation density in §1.1 and §1.2 holds up after the reference swap and your additions",
+      "<b>R1-BR9</b> — §6.3.1 states that R² is scale-invariant and that the cross-variable RMSE comparison was the actual error; §8 and §9 carry the arid-climate scope limit",
+      "<b>R1-BR10</b> — §5.4 and §7.4 no longer repeat each other",
+      "<b>R1-ED6</b> — every LIME and attention figure caption names the horizon it belongs to",
+      "<b>R1-V5</b> — §7.1 and §7.4 state the matched-versus-cross-regime comparison design explicitly",
+      "<b>R2-10</b> — §7.6 and its figure are gone, no orphan reference survives anywhere, and the §9 future-work statement is present"
+    ],
+    done:"All seven confirmed in the built documents, not in the master source.",
+    answers:"R1-BR1 · R1-BR2 · R1-BR9 · R1-BR10 · R1-ED6 · R1-V5 · R2-10"
+  }
+];
+
+
+const COVERAGE = [
+ ["R1-BR1","Intro / Related Work duplication","§1.1, §1.2, §2.1–2.4","10"],
+ ["R1-BR2","Insufficient citations","§1.1, §1.2, references","10"],
+ ["R1-BR3","\"visibility distance\"; ML abbreviation","throughout","9"],
+ ["R1-BR4","Abbreviations at first use","throughout","9"],
+ ["R1-BR5","Explain SHAP and LIME principles","§5 opening","5"],
+ ["R1-BR6","Inconsistent result ordering","§5, §6, §7","9"],
+ ["R1-BR7","Table / figure redundancy","Fig. 9; §5.4 withdrawn","9"],
+ ["R1-BR8","Visibility in native units","§4.7, §6.2.2","4"],
+ ["R1-BR9","Ordering under original units; arid scope","§6.3.1, §8, §9","10"],
+ ["R1-BR10","§5.5 / §7 overlap","§5.4, §7.4","10"],
+ ["R1-ED1","122 variables, collinearity, selection","§4.2.1, Table 5","2, 7"],
+ ["R1-ED2","Long lags for visibility","§4.2.2, Table 6","7"],
+ ["R1-ED3","Only 1 h / 6 h; lag redundancy in RNNs","§4.3, §6.4","4, 7"],
+ ["R1-ED4","StandardScaler against skew","§4.6, Table 8","7"],
+ ["R1-ED5","Which model for LIME","§5, §5.2","1, 2"],
+ ["R1-ED6","Which horizon for LIME and attention","§5, captions","10"],
+ ["R1-ED7","Fog and heatwave definitions","§7.1","7"],
+ ["R1-ED8","\"Normal\" is heterogeneous","§7.1","7"],
+ ["R1-V1","SHAP direction and physical meaning","§5.1, Fig. 2","5"],
+ ["R1-V2","Driver reordering with lead time","§5.1.1, §8, Fig. 6","5"],
+ ["R1-V3","Fig. 11 against Fig. 16 inconsistency","§7.4, single source","7, 8"],
+ ["R1-V4","Separate agreement from divergence","§5.4, Table 14","6"],
+ ["R1-V5","Cross-regime comparisons unclear","§7.1, §7.4","10"],
+ ["R2-1","30 % subsample","§4.5, Table S5","4, 7"],
+ ["R2-2","Deep models under-tuned","§4.5, Table S2","3"],
+ ["R2-3","Imputation detail","§3.3, §4.1","4"],
+ ["R2-4","Negative persistence R²","§4.1, §6.1","1, 2"],
+ ["R2-5","\">0.90 agreement\" undefined","§5.4, Table 13","6"],
+ ["R2-6","Temperature difficulty treated superficially","§8","5"],
+ ["R2-7","No CIs, tests or station variance","§4.7, §6.5","4, 7"],
+ ["R2-8","Pressure skill overstated","§6.2.3, §6.3.1","4, 7"],
+ ["R2-9","Too many figures","11 figures; §5.4 withdrawn","9"],
+ ["R2-10","Dashboard: concept or system","§7.6 withdrawn in full","10"],
+ ["R2-11","Off-domain citations","§2, references","9"],
+ ["R2-12","Encoding artefacts","rebuilt source","9"],
+ ["R2-13","Duplicated blocks","§7.3, §7.4","9"]
+];
+
+function renderCoverage(){
+  const body = COVERAGE.map(([id,ask,where,stage])=>
+    `<tr><td class="cov-id">${id}</td><td>${ask}</td><td class="cov-where">${where}</td><td class="cov-stage">${stage}</td></tr>`
+  ).join("");
+  document.getElementById("cov-body").innerHTML = body;
+  document.getElementById("cov-total").textContent = COVERAGE.length;
+}
+
+const KEY = "revision-run-sheet-v1";
+let state = {checks:{}, notes:{}, open:{}, theme:null};
+
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY);
+    if(raw) state = Object.assign(state, JSON.parse(raw));
+  }catch(e){ /* storage unavailable — the sheet still works, it just will not remember */ }
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(state)); }
+  catch(e){ toast("Progress could not be saved in this browser."); }
+}
+function toast(msg){
+  const el = document.getElementById("status");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=>el.classList.remove("show"), 2600);
+}
+
+function render(){
+  const host = document.getElementById("stages");
+  const rail = document.getElementById("rail");
+  host.innerHTML = ""; rail.innerHTML = "";
+
+  STAGES.forEach(s=>{
+    const open = state.open[s.id] !== false && !!state.open[s.id];
+    const sec = document.createElement("section");
+    sec.className = "stage" + (s.gate ? " gate":"") + (open ? " open":"");
+    sec.id = "stage-" + s.id;
+
+    const tasks = s.tasks.map((t,i)=>{
+      const k = s.id + ":" + i;
+      const on = !!state.checks[k];
+      return `<li><label class="task">
+        <input type="checkbox" data-key="${k}" ${on?"checked":""}>
+        <span>${t}</span></label></li>`;
+    }).join("");
+
+    sec.innerHTML = `
+      <div class="stage-head" role="button" tabindex="0" aria-expanded="${open}">
+        <div class="stage-num">${s.n}</div>
+        <div class="stage-title">
+          <h3>${s.title}</h3>
+          <p class="stage-sub">${s.sub}</p>
+        </div>
+        <div class="stage-meta">
+          <span class="tally" data-tally="${s.id}"></span>
+          <span class="chev" aria-hidden="true"></span>
+        </div>
+      </div>
+      <div class="stage-body">
+        ${s.gate ? `<div class="gate-note">${s.gateText}</div>` : ""}
+        ${s.brief ? `<div class="brief">${s.brief}</div>` : ""}
+        ${s.pre ? `<pre>${s.pre.replace(/&/g,"&amp;").replace(/</g,"&lt;")}</pre>` : ""}
+        <ul class="tasks">${tasks}</ul>
+        <div class="donewhen"><b>Done when:</b> ${s.done}</div>
+        ${s.answers ? `<div class="answers">Answers ${s.answers}</div>` : ""}
+        <div class="notes">
+          <label for="notes-${s.id}">Notes — record anything the handover note will need</label>
+          <textarea id="notes-${s.id}" data-notes="${s.id}" placeholder="Values recorded, decisions taken, anything you flagged">${(state.notes[s.id]||"").replace(/</g,"&lt;")}</textarea>
+        </div>
+      </div>`;
+    host.appendChild(sec);
+
+    const li = document.createElement("li");
+    li.innerHTML = `<a href="#stage-${s.id}" data-jump="${s.id}">
+      <span class="pip" data-pip="${s.id}"></span>
+      <span>${s.title}</span>
+      ${s.gate ? '<span class="gate">gate</span>' : ''}</a>`;
+    rail.appendChild(li);
+  });
+
+  wire();
+  tally();
+}
+
+function wire(){
+  document.querySelectorAll(".stage-head").forEach(h=>{
+    const toggle = ()=>{
+      const sec = h.closest(".stage");
+      const id = sec.id.replace("stage-","");
+      state.open[id] = !sec.classList.contains("open");
+      sec.classList.toggle("open");
+      h.setAttribute("aria-expanded", sec.classList.contains("open"));
+      save();
+    };
+    h.addEventListener("click", toggle);
+    h.addEventListener("keydown", e=>{
+      if(e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); }
+    });
+  });
+
+  document.querySelectorAll('input[type="checkbox"][data-key]').forEach(cb=>{
+    cb.addEventListener("change", ()=>{
+      state.checks[cb.dataset.key] = cb.checked;
+      save(); tally();
+    });
+  });
+
+  document.querySelectorAll("textarea[data-notes]").forEach(ta=>{
+    ta.addEventListener("input", ()=>{
+      state.notes[ta.dataset.notes] = ta.value;
+      clearTimeout(ta._t);
+      ta._t = setTimeout(save, 400);
+    });
+  });
+
+  document.querySelectorAll("a[data-jump]").forEach(a=>{
+    a.addEventListener("click", ()=>{
+      const id = a.dataset.jump;
+      state.open[id] = true;
+      const sec = document.getElementById("stage-" + id);
+      sec.classList.add("open");
+      sec.querySelector(".stage-head").setAttribute("aria-expanded","true");
+      save();
+      setTimeout(markCurrent, 420);
+    });
+  });
+}
+
+function stageCounts(s){
+  let done = 0;
+  s.tasks.forEach((_,i)=>{ if(state.checks[s.id+":"+i]) done++; });
+  return {done, total:s.tasks.length};
+}
+
+function tally(){
+  let all = 0, allDone = 0;
+  STAGES.forEach(s=>{
+    const {done,total} = stageCounts(s);
+    all += total; allDone += done;
+
+    const t = document.querySelector(`[data-tally="${s.id}"]`);
+    if(t) t.textContent = done + "/" + total;
+
+    const sec = document.getElementById("stage-" + s.id);
+    if(sec) sec.classList.toggle("complete", done === total);
+
+    const pip = document.querySelector(`[data-pip="${s.id}"]`);
+    if(pip){
+      pip.className = "pip" + (done === total ? " full" : done > 0 ? " part" : "");
+      pip.textContent = done === total ? "✓" : s.n;
+    }
+  });
+  document.getElementById("count").textContent = allDone + " / " + all;
+  document.getElementById("fill").style.width = all ? (allDone/all*100) + "%" : "0%";
+}
+
+function reportText(){
+  const lines = ["REVISION RUN SHEET — STATUS", ""];
+  let all = 0, allDone = 0;
+  STAGES.forEach(s=>{
+    const {done,total} = stageCounts(s);
+    all += total; allDone += done;
+    const mark = done === total ? "COMPLETE" : done > 0 ? "IN PROGRESS" : "NOT STARTED";
+    lines.push(`Stage ${s.n} — ${s.title}: ${done}/${total} ${mark}${s.gate ? " [checkpoint]" : ""}`);
+    s.tasks.forEach((t,i)=>{
+      const clean = t.replace(/<[^>]+>/g,"");
+      lines.push(`   [${state.checks[s.id+":"+i] ? "x" : " "}] ${clean}`);
+    });
+    if((state.notes[s.id]||"").trim()){
+      lines.push("   Notes: " + state.notes[s.id].trim().replace(/\n/g,"\n          "));
+    }
+    lines.push("");
+  });
+  lines.unshift(`Overall: ${allDone} / ${all} tasks complete`, "");
+  return lines.join("\n");
+}
+
+document.getElementById("report").addEventListener("click", async ()=>{
+  const text = reportText();
+  try{
+    await navigator.clipboard.writeText(text);
+    toast("Status report copied to the clipboard.");
+  }catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand("copy"); toast("Status report copied to the clipboard."); }
+    catch(_){ toast("Copy failed — select the text manually from the page."); }
+    ta.remove();
+  }
+});
+
+document.getElementById("expand").addEventListener("click", e=>{
+  const anyClosed = STAGES.some(s=>!state.open[s.id]);
+  STAGES.forEach(s=>{ state.open[s.id] = anyClosed; });
+  save(); render();
+  e.target.textContent = anyClosed ? "Collapse all" : "Expand all";
+});
+
+document.getElementById("reset").addEventListener("click", ()=>{
+  if(!confirm("Clear every tick and every note on this sheet? This cannot be undone.")) return;
+  state.checks = {}; state.notes = {};
+  save(); render();
+  toast("Sheet cleared.");
+});
+
+const themeBtn = document.getElementById("theme");
+function applyTheme(){
+  if(state.theme){
+    document.documentElement.setAttribute("data-theme", state.theme);
+    themeBtn.textContent = state.theme === "dark" ? "Light" : "Dark";
+  }else{
+    document.documentElement.removeAttribute("data-theme");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    themeBtn.textContent = dark ? "Light" : "Dark";
+  }
+}
+themeBtn.addEventListener("click", ()=>{
+  const dark = state.theme ? state.theme === "dark"
+    : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  state.theme = dark ? "light" : "dark";
+  applyTheme(); save();
+});
+
+const railLinks = () => Array.from(document.querySelectorAll("a[data-jump]"));
+function measureMast(){
+  const m = document.querySelector(".masthead");
+  if(m) document.documentElement.style.setProperty("--mast-h", m.offsetHeight + "px");
+}
+window.addEventListener("resize", measureMast, {passive:true});
+
+function markCurrent(){
+  const cut = (parseInt(getComputedStyle(document.documentElement)
+    .getPropertyValue("--mast-h")) || 86) + 60;
+  let best = null, bestTop = Infinity;
+  STAGES.forEach(s=>{
+    const el = document.getElementById("stage-" + s.id);
+    if(!el) return;
+    const top = el.getBoundingClientRect().top;
+    if(top < cut && top > -el.offsetHeight && Math.abs(top) < bestTop){
+      bestTop = Math.abs(top); best = s.id;
+    }
+  });
+  railLinks().forEach(a=>a.classList.toggle("current", a.dataset.jump === best));
+}
+window.addEventListener("scroll", ()=>{
+  clearTimeout(markCurrent._t);
+  markCurrent._t = setTimeout(markCurrent, 90);
+}, {passive:true});
+
+load();
+if(Object.keys(state.open).length === 0) state.open = {prep:true, audit:true};
+applyTheme();
+render();
+renderCoverage();
+measureMast();
+markCurrent();
+window.addEventListener("load", measureMast);
+</script>
+</body>
+</html>
