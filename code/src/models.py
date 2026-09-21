@@ -28,15 +28,15 @@ def chronological_split(df: pd.DataFrame, fracs=C.SPLIT_FRACTIONS):
     for different stations and break the "evaluated on future time periods"
     claim. Cut dates are written out and quoted in the revised Section 4.4.
     """
-    t = df[C.COL_TIME]
-    order = np.argsort(t.values)
-    ts = t.values[order]
-    i1 = int(fracs[0] * len(ts))
-    i2 = int((fracs[0] + fracs[1]) * len(ts))
-    cut1, cut2 = ts[i1], ts[i2]
-    train = df[t < cut1]
-    val = df[(t >= cut1) & (t < cut2)]
-    test = df[t >= cut2]
+    t = pd.to_datetime(df[C.COL_TIME], utc=True)
+    order = np.argsort(t.to_numpy())
+    sorted_t = t.iloc[order]
+    i1 = int(fracs[0] * len(sorted_t))
+    i2 = int((fracs[0] + fracs[1]) * len(sorted_t))
+    cut1, cut2 = sorted_t.iloc[i1], sorted_t.iloc[i2]
+    train = df.loc[t < cut1]
+    val = df.loc[(t >= cut1) & (t < cut2)]
+    test = df.loc[t >= cut2]
     meta = {"cut_train_val": str(cut1), "cut_val_test": str(cut2),
             "n_train": len(train), "n_val": len(val), "n_test": len(test)}
     with open(os.path.join(C.OUT_TABLES, "split_meta.json"), "w") as f:
@@ -50,14 +50,15 @@ def purged_blocked_cv(df: pd.DataFrame, n_splits: int = 5, embargo_h: int = 24):
     The embargo removes `embargo_h` hours either side of each boundary so that
     a 24 h lag feature in the validation block cannot see a training target.
     """
-    t = np.sort(df[C.COL_TIME].unique())
+    clock = pd.to_datetime(df[C.COL_TIME], utc=True)
+    t = np.sort(clock.unique())
     bounds = np.array_split(t, n_splits + 1)
     emb = pd.Timedelta(hours=embargo_h)
     for k in range(1, n_splits + 1):
-        tr_end = bounds[k - 1][-1]
+        tr_end = pd.Timestamp(bounds[k - 1][-1])
         va = bounds[k]
-        tr_mask = df[C.COL_TIME] <= (tr_end - emb)
-        va_mask = (df[C.COL_TIME] >= va[0]) & (df[C.COL_TIME] <= va[-1])
+        tr_mask = clock <= (tr_end - emb)
+        va_mask = (clock >= pd.Timestamp(va[0])) & (clock <= pd.Timestamp(va[-1]))
         yield np.flatnonzero(tr_mask), np.flatnonzero(va_mask)
 
 
