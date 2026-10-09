@@ -72,8 +72,8 @@ def run_scaling_sensitivity(build_fn, fit_fn, df, target, horizon,
     for s in strategies:
         Xtr, ytr, Xva, yva, Xte, yte, scaler, tcol = build_fn(df, s)
         m = fit_fn(Xtr, ytr, Xva, yva)
-        yhat = scaler.inverse_target(m.predict(Xte), tcol)
-        r = _metrics(scaler.inverse_target(yte, tcol), yhat)
+        # Targets stay native; Scaler is fit on feature columns only.
+        r = _metrics(yte, m.predict(Xte))
         r.update({"strategy": s, "target": target, "horizon_h": horizon,
                   "units": "native"})
         rows.append(r)

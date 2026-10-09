@@ -1,0 +1,7 @@
+target,horizon_h,model_a,model_b,dm_stat,p_value,n,mean_loss_diff,better,significant_at_5pct
+visibility,2,XGBoost,Persistence,-37.94820970872626,0.0,335809,-214408.89637269653,A,True
+visibility,2,LightGBM,Persistence,-39.47972201602393,0.0,335809,-217143.16182608917,A,True
+visibility,4,XGBoost,Persistence,-36.55870484788664,0.0,335586,-527876.6407428196,A,True
+visibility,4,LightGBM,Persistence,-36.23424859682955,0.0,335586,-536480.4861674572,A,True
+visibility,5,XGBoost,Persistence,-36.98567046749029,0.0,335482,-706176.4435811866,A,True
+visibility,5,LightGBM,Persistence,-37.245195656589246,0.0,335482,-699910.0894576374,A,True

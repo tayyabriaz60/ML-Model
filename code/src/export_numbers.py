@@ -61,7 +61,15 @@ def collect() -> dict:
             n[f"AUDIT_{t.upper()}_PERSIST_R2_GROUPED"] = _fmt(v["grouped"]["r2"])
             n[f"AUDIT_{t.upper()}_PERSIST_R2_UNGROUPED"] = _fmt(v["ungrouped"]["r2"])
             n[f"AUDIT_{t.upper()}_PERSIST_RMSE_GROUPED"] = _fmt(v["grouped"]["rmse"])
+            n[f"AUDIT_{t.upper()}_PERSIST_RMSE_UNGROUPED"] = _fmt(v["ungrouped"]["rmse"])
+            n[f"AUDIT_{t.upper()}_PERSIST_MAE_GROUPED"] = _fmt(v["grouped"]["mae"])
             n[f"AUDIT_{t.upper()}_AUTOCORR_1H"] = _fmt(v["grouped"]["lag1_autocorr"])
+            n[f"AUDIT_{t.upper()}_R2_FROM_LAG1"] = _fmt(
+                2.0 * v["grouped"]["lag1_autocorr"] - 1.0)
+            rmse_g = v["grouped"]["rmse"]
+            mae_g = v["grouped"]["mae"]
+            n[f"AUDIT_{t.upper()}_RMSE_OVER_MAE_GROUPED"] = _fmt(
+                rmse_g / mae_g if mae_g else float("nan"), 2)
             n[f"AUDIT_{t.upper()}_SD"] = _fmt(v["grouped"]["target_sd"])
             n[f"AUDIT_{t.upper()}_VERDICT"] = v["verdict"]
 
@@ -75,6 +83,14 @@ def collect() -> dict:
             n[f"GAP_{col}_MEDIAN_H"] = _fmt(v["median_gap_h"], 1)
             n[f"GAP_{col}_MAX_H"] = _fmt(v["max_gap_h"], 0)
             n[f"GAP_{col}_PCT_LE6H"] = _fmt(v["pct_rows_in_gaps_le_6h"], 2)
+        if "n_rows_full_hourly_grid" in m:
+            n["N_ROWS_HOURLY"] = f"{int(m['n_rows_full_hourly_grid']):,}"
+        if m.get("per_station"):
+            n["N_STATIONS"] = str(len(m["per_station"]))
+    n.setdefault("N_STATIONS", "29")
+    n["STUDY_START"] = C.STUDY_START
+    n["STUDY_END"] = C.STUDY_END
+    n["LIME_N"] = str(getattr(C, "LIME_N_INSTANCES", 200))
 
     # ---- split -----------------------------------------------------------
     p = os.path.join(C.OUT_TABLES, "split_meta.json")
@@ -107,6 +123,18 @@ def collect() -> dict:
                     n[f"BEST_{tgt.upper()}_H{int(h)}_R2"] = _fmt(best.R2)
                     n[f"BEST_{tgt.upper()}_H{int(h)}_RMSE"] = _fmt(best.RMSE)
 
+    # ---- Diebold-Mariano (trees vs persistence + trees vs DL) ------------
+    p = os.path.join(C.OUT_TABLES, "dm_trees_vs_dl.csv")
+    if os.path.exists(p):
+        dm = pd.read_csv(p)
+        for _, r in dm.iterrows():
+            a = str(r.model_a).upper().replace(" ", "")
+            b = str(r.model_b).upper().replace(" ", "")
+            k = f"DM_{r.target.upper()}_H{int(r.horizon_h)}_{a}_VS_{b}"
+            n[f"{k}_STAT"] = _fmt(r.dm_stat, 3)
+            n[f"{k}_P"] = _fmt(r.p_value, 4)
+            n[f"{k}_BETTER"] = str(r.better)
+
     # ---- agreement -------------------------------------------------------
     for f in glob.glob(os.path.join(C.OUT_XAI, "*", "agreement.json")):
         key = os.path.basename(os.path.dirname(f)).upper()
@@ -130,9 +158,11 @@ def collect() -> dict:
                 n["FOG_N_DENSE"] = f"{int(t.dense.sum()):,}"
                 n["FOG_MIN_VIS_MEDIAN_M"] = _fmt(t.min_visibility_m.median(), 0)
             if key == "HEAT" and len(t):
-                n["HEAT_N_HEATWAVE"] = f"{int((t.label == 'heatwave').sum()):,}"
+                hw = t[t.label == "heatwave"]
+                n["HEAT_N_HEATWAVE"] = f"{int(len(hw)):,}"
                 n["HEAT_N_SHORT"] = f"{int((t.label != 'heatwave').sum()):,}"
-                n["HEAT_MEDIAN_DURATION_D"] = _fmt(t.duration_days.median(), 1)
+                if len(hw):
+                    n["HEAT_MEDIAN_DURATION_D"] = _fmt(hw.duration_days.median(), 1)
 
     p = os.path.join(C.OUT_TABLES, "normal_class_composition.json")
     if os.path.exists(p):
@@ -169,10 +199,12 @@ def collect() -> dict:
         c = json.load(open(p))
         n["COLLIN_N_PAIRS_ABOVE_095"] = str(c["n_pairs_above_thresh"])
         n["COLLIN_MEAN_ABS_R"] = _fmt(c["mean_abs_corr"], 3)
-
-    n["N_FEATURES_TOTAL"] = str(len(pd.read_csv(
-        os.path.join(C.OUT_TABLES, "vif_report.csv")))) if os.path.exists(
-        os.path.join(C.OUT_TABLES, "vif_report.csv")) else "122"
+        n["N_FEATURES_TOTAL"] = str(c.get("n_features", 122))
+    elif os.path.exists(os.path.join(C.OUT_TABLES, "vif_report.csv")):
+        n["N_FEATURES_TOTAL"] = str(len(pd.read_csv(
+            os.path.join(C.OUT_TABLES, "vif_report.csv"))))
+    else:
+        n["N_FEATURES_TOTAL"] = "122"
 
     with open(NUMBERS_PATH, "w") as f:
         json.dump(n, f, indent=2, sort_keys=True)

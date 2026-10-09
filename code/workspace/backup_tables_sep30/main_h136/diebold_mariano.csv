@@ -1,0 +1,7 @@
+target,horizon_h,model_a,model_b,dm_stat,p_value,n,mean_loss_diff,better,significant_at_5pct
+pressure,1,XGBoost,Persistence,-39.07457496890089,0.0,335813,-0.3684438230032473,A,True
+pressure,1,LightGBM,Persistence,-21.396663310080484,0.0,335813,-0.3313865839805096,A,True
+pressure,3,XGBoost,Persistence,-91.26570413056437,0.0,335480,-1.2462313388455297,A,True
+pressure,3,LightGBM,Persistence,-139.6066169394201,0.0,335480,-1.3260774889331952,A,True
+pressure,6,XGBoost,Persistence,-155.5006640132449,0.0,335027,-3.004977288063405,A,True
+pressure,6,LightGBM,Persistence,-159.21816149026225,0.0,335027,-3.026956902053858,A,True

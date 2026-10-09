@@ -9,11 +9,20 @@ Client contract: **ML Model Test and Enhancement T5.R1**, 5 working days, four d
 | # | File | Source |
 |---|---|---|
 | 1 | `code/` rerun | `code/run_all.py` |
-| 2 | `manuscript_marked_up.docx` | numbers from `outputs/manuscript_numbers.json` into `[[KEY]]` placeholders |
-| 3 | `manuscript_clean.docx` | same, clean copy |
-| 4 | `response_letter.docx` | `letter/response_letter.docx` after the numbers export |
+| 2 | `manuscript_marked_up.docx` | `python build_manuscript.py` after Stage 9; then Word mark-up |
+| 3 | `manuscript_clean.docx` | same filled text, clean copy |
+| 4 | `response_letter.docx` | `python build_letter.py` after Stage 9 |
 
 Do not type numbers by hand. Stage 9 writes `manuscript_numbers.json`; the letter and manuscript substitute `[[KEY]]`.
+
+Word copies (re-run after Stage 9):
+
+```bash
+cd code
+python build_docx.py
+```
+
+Outputs: `manuscript/manuscript_clean.docx`, `manuscript/manuscript_marked_up.docx`, `letter/response_letter.docx`, and copies in `deliverables/`. Yellow highlight = changed diagnostic or an unfilled `[[KEY]]`.
 
 ## What this repo contains
 

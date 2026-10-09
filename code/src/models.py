@@ -82,28 +82,30 @@ class Scaler:
 
     def fit(self, X: pd.DataFrame):
         for c in X.columns:
-            v = X[c].astype(float)
+            v = X[c].to_numpy(np.float64, copy=False)
             log = self.strategy == "log1p_standard" and self._needs_log(c, self.skewed)
             if log:
                 v = np.log1p(np.clip(v, 0, None))
             if self.strategy == "robust":
-                centre = float(v.median())
-                scale = float(v.quantile(0.75) - v.quantile(0.25)) or 1.0
+                centre = float(np.nanmedian(v))
+                q75, q25 = np.nanpercentile(v, [75, 25])
+                scale = float(q75 - q25) or 1.0
             else:
-                centre = float(v.mean())
-                scale = float(v.std()) or 1.0
+                centre = float(np.nanmean(v))
+                scale = float(np.nanstd(v)) or 1.0
             self.params[c] = {"log": log, "centre": centre, "scale": scale}
         return self
 
     def transform(self, X: pd.DataFrame) -> pd.DataFrame:
-        out = {}
-        for c in X.columns:
+        cols = list(X.columns)
+        out = np.empty((len(X), len(cols)), dtype=np.float32)
+        for j, c in enumerate(cols):
             p = self.params[c]
-            v = X[c].astype(float)
+            v = X[c].to_numpy(np.float64, copy=False)
             if p["log"]:
                 v = np.log1p(np.clip(v, 0, None))
-            out[c] = (v - p["centre"]) / p["scale"]
-        return pd.DataFrame(out, index=X.index)
+            out[:, j] = (v - p["centre"]) / p["scale"]
+        return pd.DataFrame(out, index=X.index, columns=cols)
 
     def fit_transform(self, X): return self.fit(X).transform(X)
 
@@ -116,6 +118,13 @@ class Scaler:
     def save(self, path):
         with open(path, "w") as f:
             json.dump({"strategy": self.strategy, "params": self.params}, f)
+
+    @classmethod
+    def load(cls, path):
+        data = json.load(open(path))
+        sc = cls(strategy=data["strategy"])
+        sc.params = data["params"]
+        return sc
 
 
 # --------------------------------------------------------------------------
@@ -131,31 +140,56 @@ def persistence_predict(df: pd.DataFrame, target: str, horizon: int) -> np.ndarr
 # --------------------------------------------------------------------------
 # Tree models
 # --------------------------------------------------------------------------
+def _cuda_ok() -> bool:
+    try:
+        import torch
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
+
+
 def fit_xgboost(Xtr, ytr, Xva, yva, params: C.TreeParams | None = None):
     import xgboost as xgb
     p = params or C.TreeParams()
-    m = xgb.XGBRegressor(
+    kw = dict(
         max_depth=p.max_depth, learning_rate=p.learning_rate,
         n_estimators=p.n_estimators, subsample=p.subsample,
         colsample_bytree=p.colsample_bytree, min_child_weight=p.min_child_weight,
         reg_lambda=p.reg_lambda, random_state=p.random_state,
         early_stopping_rounds=p.early_stopping_rounds,
         tree_method="hist", n_jobs=-1)
+    if _cuda_ok():
+        kw["device"] = "cuda"
+    m = xgb.XGBRegressor(**kw)
     m.fit(Xtr, ytr, eval_set=[(Xva, yva)], verbose=False)
+    if kw.get("device") == "cuda":
+        try:
+            m.set_params(device="cpu")
+        except Exception:
+            pass
     return m
 
 
 def fit_lightgbm(Xtr, ytr, Xva, yva, params: C.TreeParams | None = None):
     import lightgbm as lgb
     p = params or C.TreeParams()
-    m = lgb.LGBMRegressor(
+    kw = dict(
         max_depth=p.max_depth, learning_rate=p.learning_rate,
         n_estimators=p.n_estimators, subsample=p.subsample,
         colsample_bytree=p.colsample_bytree,
         min_child_samples=max(5, int(p.min_child_weight)),
         reg_lambda=p.reg_lambda, random_state=p.random_state, n_jobs=-1)
-    m.fit(Xtr, ytr, eval_set=[(Xva, yva)],
-          callbacks=[lgb.early_stopping(p.early_stopping_rounds, verbose=False)])
+    if _cuda_ok():
+        kw["device"] = "gpu"
+    m = lgb.LGBMRegressor(**kw)
+    try:
+        m.fit(Xtr, ytr, eval_set=[(Xva, yva)],
+              callbacks=[lgb.early_stopping(p.early_stopping_rounds, verbose=False)])
+    except Exception:
+        kw.pop("device", None)
+        m = lgb.LGBMRegressor(**kw)
+        m.fit(Xtr, ytr, eval_set=[(Xva, yva)],
+              callbacks=[lgb.early_stopping(p.early_stopping_rounds, verbose=False)])
     return m
 
 

@@ -82,16 +82,18 @@ def heat_threshold(df: pd.DataFrame, pct=C.HEAT_PERCENTILE,
     d = df.copy()
     d["date"] = d[C.COL_TIME].dt.date
     d["doy"] = d[C.COL_TIME].dt.dayofyear
-    daily = (d.groupby([C.COL_STATION, "date", "doy"])["AIR_TEMPERATURE"]
+    daily = (d.groupby([C.COL_STATION, "date", "doy"], sort=False)["AIR_TEMPERATURE"]
                .max().reset_index(name="tmax"))
     rows = []
-    for stn, g in daily.groupby(C.COL_STATION):
-        for doy in range(1, 367):
-            diff = np.abs(g.doy - doy)
-            sel = g[np.minimum(diff, 365 - diff) <= window_days]
-            if len(sel) >= 30:
-                rows.append({"station": stn, "doy": doy,
-                             "tmax_p95": float(sel.tmax.quantile(pct))})
+    for stn, g in daily.groupby(C.COL_STATION, sort=False):
+        doy = g.doy.to_numpy()
+        tmax = g.tmax.to_numpy(float)
+        for d0 in range(1, 367):
+            circ = np.minimum(np.abs(doy - d0), 365 - np.abs(doy - d0))
+            sel = tmax[circ <= window_days]
+            if sel.size >= 30:
+                rows.append({"station": stn, "doy": d0,
+                             "tmax_p95": float(np.quantile(sel, pct))})
     t = pd.DataFrame(rows)
     t.to_csv(os.path.join(C.OUT_TABLES, "heat_thresholds.csv"), index=False)
     return t
@@ -145,14 +147,39 @@ def regime_labels(df: pd.DataFrame, fog: pd.DataFrame,
     its heterogeneity can be answered with numbers rather than a caveat.
     """
     lab = pd.Series("normal", index=df.index, dtype=object)
-    t = df[C.COL_TIME]
-    for _, r in heat.iterrows():
-        m = ((df[C.COL_STATION] == r.station) &
-             (t.dt.date >= r.start) & (t.dt.date <= r.end))
-        lab[m] = r.label
-    for _, r in fog.iterrows():
-        m = ((df[C.COL_STATION] == r.station) & (t >= r.start) & (t <= r.end))
-        lab[m] = "fog"
+    clock = pd.to_datetime(df[C.COL_TIME], utc=True)
+
+    if heat is not None and len(heat):
+        days = []
+        for r in heat.itertuples(index=False):
+            start = pd.Timestamp(r.start).normalize()
+            end = pd.Timestamp(r.end).normalize()
+            for day in pd.date_range(start, end, freq="D"):
+                days.append({C.COL_STATION: r.station, "_date": day.date(),
+                             "hlabel": r.label,
+                             "_pri": int(r.label == "heatwave")})
+        hd = (pd.DataFrame(days)
+              .sort_values("_pri")
+              .drop_duplicates([C.COL_STATION, "_date"], keep="last"))
+        tmp = pd.DataFrame({C.COL_STATION: df[C.COL_STATION].to_numpy(),
+                            "_date": clock.dt.date, "_i": df.index.to_numpy()})
+        tmp = tmp.merge(hd[[C.COL_STATION, "_date", "hlabel"]],
+                        on=[C.COL_STATION, "_date"], how="left")
+        hit = tmp.hlabel.notna()
+        lab.loc[tmp.loc[hit, "_i"]] = tmp.loc[hit, "hlabel"].to_numpy()
+
+    if fog is not None and len(fog):
+        stn = df[C.COL_STATION].to_numpy()
+        tvals = clock.to_numpy()
+        for station, ev in fog.groupby("station", sort=False):
+            idx = np.flatnonzero(stn == station)
+            tv = tvals[idx]
+            mask = np.zeros(len(idx), dtype=bool)
+            starts = pd.to_datetime(ev.start, utc=True).to_numpy()
+            ends = pd.to_datetime(ev.end, utc=True).to_numpy()
+            for a, b in zip(starts, ends):
+                mask |= (tv >= a) & (tv <= b)
+            lab.iloc[idx[mask]] = "fog"
     return lab
 
 

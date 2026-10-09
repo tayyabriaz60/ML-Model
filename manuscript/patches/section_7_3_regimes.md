@@ -1,0 +1,3 @@
+### 7.3 Case studies and matched versus cross-regime design
+
+==Primary comparisons pair each target with its matched extreme regime: visibility with fog hours (visibility below 1 000 m), temperature with heatwave hours (three-day sustained exceedance of the local calendar-day 95th percentile). Cross-regime cells (e.g. temperature attribution during fog, visibility skill during heat) are descriptive only; they are not used to claim that the same driver ordering “generalises” across regimes. Fig. 11 summarises episode duration and intensity for the longest fog and heat events; full time-series panels are in Supplementary Fig. S4 when the original hourly trace is available at the station.==

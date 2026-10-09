@@ -119,10 +119,16 @@ def per_station_metrics(y_true, y_pred, y_persist, stations) -> dict:
 # --------------------------------------------------------------------------
 def block_bootstrap_ci(y_true, y_pred, stat="rmse", n_boot=C.BOOTSTRAP_N,
                        block=C.BOOTSTRAP_BLOCK_H, level=C.CI_LEVEL,
-                       seed=C.SEED) -> dict:
+                       seed=C.SEED, mask=None) -> dict:
     """Moving-block bootstrap CI. Plain i.i.d. resampling would be wrong here
-    because hourly forecast errors are strongly autocorrelated."""
+    because hourly forecast errors are strongly autocorrelated.
+
+    When ``mask`` is set (observed-target rows), CIs match headline Table 8.
+    """
     y, yhat = np.asarray(y_true, float), np.asarray(y_pred, float)
+    if mask is not None:
+        m = np.asarray(mask, bool)
+        y, yhat = y[m], yhat[m]
     ok = np.isfinite(y) & np.isfinite(yhat)
     y, yhat = y[ok], yhat[ok]
     n = len(y)

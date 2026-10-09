@@ -11,6 +11,16 @@ briefing/*.pdf
 data/raw/*.csv
 data/raw/*.json
 
+# Processed features (~400 MB); upload to RunPod separately (scp/rsync)
+data/processed/
+
+# Milestone zips and local pod scratch
+deliverables/
+pod_out/
+
+# Never commit keys
+runpod_ssh_public_key.txt
+
 # Pipeline runtime
 **/__pycache__/
 *.pyc

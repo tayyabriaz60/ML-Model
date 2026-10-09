@@ -3,20 +3,20 @@ Step 1-2 of the revision plan: load the raw KAPSARC hourly export, clean it,
 document the missingness, and run the STATION-GROUPING AUDIT.
 
 The audit in `audit_station_grouping()` is the single most important function
-in this package. It tests the hypothesis that the originally submitted feature
-pipeline computed lag / rolling / persistence features on a frame sorted by
-timestamp with all 29 stations interleaved, i.e. WITHOUT a groupby(station).
-If that happened, `lag_1` is the previous ROW (a different station in the same
-hour), not the previous HOUR at the same station.
+in this package. It tests — it does not assume — the hypothesis that the
+submitted feature pipeline computed lag / rolling / persistence features on a
+frame sorted by timestamp with all 29 stations interleaved.
 
 Symptom in the submitted manuscript (Table 5, 1 h air temperature):
     persistence  RMSE = 0.8864, MAE = 0.0568, R2 = -0.5144
     XGBoost      RMSE = 0.6485, R2 = 0.1893
 A RMSE/MAE ratio of ~15 and an implied hourly autocorrelation of ~0.24 are not
-physically possible for station air temperature. Cross-station contamination
-explains it, and it also explains why pressure (spatially coherent) and
-visibility (saturated at 10 km) were barely affected while temperature
-collapsed.
+physically possible for station air temperature in native °C.
+
+On the Historical.zip 2009–2019 extract the ungrouped variant does NOT
+reproduce Table 5 (see notes/AUDIT_VERDICT.md). Write the letter and §4.1 / §6.1
+as a units + missingness defect, not as a confirmed cross-station lag bug.
+Still apply groupby(station) everywhere and abort if the leakage assert fails.
 
 Run this BEFORE touching anything else.
 """
@@ -195,7 +195,7 @@ def staged_impute(df: pd.DataFrame, max_ffill: int = 6,
       1. groupby(station) is explicit and non-optional;
       2. every imputed cell is flagged so that the test-set evaluation can be
          restricted to OBSERVED targets only (Reviewer 2, bullet 3). Reporting
-         R2 = 0.98 for pressure when 46 % of pressure was imputed is not a
+         R2 = 0.98 for pressure when most pressure cells were imputed is not a
          defensible claim.
     Mean imputation is now applied per station-month rather than globally, and
     only to PREDICTORS. Targets are never mean-imputed; rows whose target is

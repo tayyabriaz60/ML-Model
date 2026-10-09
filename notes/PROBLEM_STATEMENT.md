@@ -14,17 +14,17 @@ Fix a feature-engineering bug, rerun the supplied Python pipeline end to end, an
 
 Text is already drafted. Numbers auto-fill from the run via `[[KEY]]`. Follow the HTML run-sheet checklist.
 
-## Root cause the client already identified
+## Root cause — client hypothesis vs audit
 
-Lag, rolling, and persistence features were built on a timestamp-sorted frame with **29 stations interleaved** and **no `groupby(station)`**. `lag_1` is another station in the same hour, not the previous hour at the same site.
+Client / work-order story: lags built without `groupby(station)`, so Table 5 is cross-station contamination.
 
-Submitted Table 5 (1 h temperature persistence) is physically impossible as a set:
+**Audit (see `AUDIT_VERDICT.md`): NOT CONFIRMED.** Within-station 1 h temperature persistence is R² 0.97 in native °C. Table 5 (RMSE 0.8864, MAE 0.0568, R² −0.5144) is a scaled-unit / reporting defect. Pressure is 78 % missing. Still regenerate everything; do not write the ungrouped-lag story to the editor.
+
+Submitted Table 5 is still internally impossible as a set of °C metrics:
 
 - RMSE = 0.8864 °C
 - MAE = 0.0568 °C
 - R² = −0.5144
-
-Pressure (spatially coherent) and visibility (often at the reporting ceiling) survived; temperature collapsed. Stage 1 audit must confirm this before any manuscript edit.
 
 Second defect: three different SHAP values for one fog-regime quantity (Table 9 / Fig. 16 / Fig. 22). Fix is one shared values file, not hand edits.
 
@@ -51,13 +51,13 @@ Prose / structure only: ~12 points (Intro vs Related Work, citations, terminolog
 
 Withdraw, do not repair: XAI dashboard, temporal saliency.
 
-## Missing pieces the client package did not include
+## Builders (added 2026-09-23)
 
-- `manuscript_master.md`
-- `build_manuscript.py`
-- `build_letter.py`
+- `manuscript/manuscript_master.md` — revision source; edit this, not the filled copy
+- `code/build_manuscript.py` — substitutes `[[KEY]]` → `manuscript/manuscript_filled.md`
+- `code/build_letter.py` — same for `letter/letter_text.txt` → `letter/response_letter_filled.txt`
 
-Until those exist, Stages 8–9 can still write `manuscript_numbers.json`, but Word deliverables 2–3 cannot be built automatically.
+Word `.docx` packaging still waits until Stage 9 writes a complete `manuscript_numbers.json`. Do not type numbers.
 
 ## Execution order
 

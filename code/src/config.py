@@ -168,7 +168,7 @@ RBO_P = 0.9
 # --------------------------------------------------------------------------
 # Statistics (Reviewer 2, basic reporting, bullet 7)
 # --------------------------------------------------------------------------
-BOOTSTRAP_N = 1000
+BOOTSTRAP_N = int(os.environ.get("BOOTSTRAP_N", "1000"))
 BOOTSTRAP_BLOCK_H = 24 * 7   # one-week moving blocks, respects autocorrelation
 CI_LEVEL = 0.95
 DM_LOSS = "squared"

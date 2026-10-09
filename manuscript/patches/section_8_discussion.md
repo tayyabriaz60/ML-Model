@@ -1,0 +1,7 @@
+## 8. Discussion
+
+==**Which target is hardest?** Using skill versus persistence at h = 1, visibility is the limiting target (LightGBM SS [[VISIBILITY_H1_LIGHTGBM_SKILL]]; persistence baseline R² [[VISIBILITY_H1_PERSISTENCE_R2]]). Temperature and pressure tie for ease of short-horizon prediction (temperature SS [[TEMPERATURE_H1_XGBOOST_SKILL]]; pressure SS [[PRESSURE_H1_XGBOOST_SKILL]]). ~~Temperature remains the hardest of the three targets once persistence is computed correctly.~~ Raw R² alone is misleading for visibility because many hours sit at the reporting ceiling; native-unit RMSE in metres and SS against persistence are the honest comparators (Section 6.2).==
+
+==Visibility errors reflect dust haze and ceiling effects as much as condensation fog; the WMO 1 000 m fog rule identifies [[FOG_N_EVENTS]] episodes, but the “normal” class still spends [[NORMAL_PCT_VIS_BELOW_5KM]] % of hours below 5 km visibility. Pressure must be read against [[MISS_ATMOSPHERIC_SEA_LEVEL_PRESSURE_PCT]] % hourly missingness and persistence R² = [[PRESSURE_H1_PERSISTENCE_R2]] at 1 h; incremental tree skill ([[PRESSURE_H1_XGBOOST_SKILL]]) is modest relative to that baseline.==
+
+==After 3–6 h, all three targets degrade as advection and unobserved synoptic forcing dominate; that ceiling is structural for station-local models, not evidence of under-tuning (equal [[N_TRIALS]]-trial budget per family). The phrase “very high skill” is not used anywhere in this revision.==

@@ -52,22 +52,18 @@ The submitted Table 5 reports, for 1 h air temperature, a persistence baseline
 with RMSE = 0.8864 °C, MAE = 0.0568 °C and R² = −0.5144. Those three numbers
 are mutually inconsistent: an RMSE/MAE ratio of ~15.6 means a handful of
 enormous errors dominate, and R² = −0.51 implies an hourly autocorrelation of
-about 0.24, which no station temperature series has. The most likely cause is
-that lag, rolling and persistence features were built on a frame sorted by
-timestamp with all 29 stations interleaved — no `groupby(STATION)` — so `lag_1`
-is the previous **row** (a different station in the same hour) rather than the
-previous **hour**. That also explains the pattern across targets: sea-level
-pressure is spatially coherent so it survived at R² ≈ 0.98, visibility saturates
-at 10 km so it survived at ≈ 0.84, and temperature — which differs by 15 °C
-between coastal and interior desert sites at the same hour — collapsed.
+about 0.24, which no station temperature series has.
 
 `src/data.audit_station_grouping()` computes persistence both ways and reports
-whether the ungrouped variant reproduces the submitted numbers.
+whether the ungrouped variant reproduces the submitted numbers. On the
+Historical.zip extract the verdict is **NOT CONFIRMED**: grouped 1 h temperature
+persistence is R² ≈ 0.97 in native °C; interleaved-station persistence is worse
+but still unlike Table 5. Those three figures are scaled residuals mislabelled
+as °C. Pressure is ~78 % missing on the hourly grid. See `notes/AUDIT_VERDICT.md`.
 
 * **Verdict CONFIRMED** → every table, figure and SHAP result is regenerated.
-  Budget the full 8-week plan.
-* **Verdict NOT CONFIRMED** → investigate `audit_units.json` next (are Table 5's
-  "°C" values actually z-scores?) before touching the manuscript.
+* **Verdict NOT CONFIRMED** → still regenerate (native units, groupby, equal
+  `N_TRIALS`); do not tell the editor that interleaved stations produced Table 5.
 
 ## Stages
 
@@ -112,7 +108,7 @@ Two assertions abort the pipeline rather than warn:
 
 ## What changed versus the submitted pipeline
 
-- `groupby(STATION)` on every temporal operator (was the likely root cause)
+- `groupby(STATION)` on every temporal operator (enforced; audit did not confirm this as the Table 5 cause)
 - neural models train on 100 % of the data, not 30 % (R2-1)
 - 40-trial random search for **both** tree and DL families (R2-2)
 - metrics in native units, plus a unit-free skill score vs persistence (R1-BR8/9, R2-8)
