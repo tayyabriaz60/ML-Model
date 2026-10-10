@@ -13,5 +13,6 @@ fi
 python regenerate_headline_eval.py
 python station_coverage_report.py
 python ci_mask_report.py
+python h1_xgb_lgb_ci_overlap.py
 bash pack_milestone_outputs.sh
 echo "DONE — download ../deliverables/T5_milestone_compute.zip"

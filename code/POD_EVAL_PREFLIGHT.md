@@ -1,5 +1,11 @@
 # Pod eval pre-flight checklist (send before instance start)
 
+**Client approval (2026-10-10):** Run exactly this sequence: tree pre-flight → export
+native `.json` if joblibs pass → full-train refit from `best_hyperparameters.json` on
+any failure → main eval with **Table 8** (`table08_summary_all.csv`) as bootstrap point
+authority → `run_env.txt`, `h1_xgb_lgb_ci_overlap.txt`, station note with AL KHARJ +
+pressure-block caveat (document only; no mask redesign).
+
 ## A. Instance
 - 16 vCPU, 64 GB RAM, 100 GB disk (CPU only unless DL retrain needed)
 - Ubuntu 22.04 or same OS as prior successful pod run

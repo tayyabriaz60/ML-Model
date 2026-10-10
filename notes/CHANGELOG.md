@@ -2,6 +2,7 @@
 
 | Date | Change | Why | Affects |
 |---|---|---|---|
+| 2026-10-10 | Client approved pod eval plan; station note documents NaN pressure-block caveat + AL KHARJ; `h1_xgb_lgb_ci_overlap.py` | Jarwal Ray milestone T5.R1 scope lock | deliverable zip / station_coverage_note.txt |
 | 2026-09-21 | Working tree isolated in `T5_revision/` | Single place to execute the contract | organisation only |
 | 2026-09-21 | Pipeline wiring: native-unit metrics, WindowDataset, DL tune/train, ablations, run_meta | Scaffold was not runnable as written | all regenerated tables/figures once data exists |
 | 2026-09-21 | COLUMN_MAP + 2009–2019 window + zip chunked load | Client sent Historical.zip; avoid loading 1946–2019 88-station grid | Stage 1 audit |
