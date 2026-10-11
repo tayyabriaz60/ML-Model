@@ -128,6 +128,15 @@ def _matrices(F, target, horizon, cols, scaler=None, strategy=None):
     return parts, sc
 
 
+def _observed_mask(obs) -> np.ndarray | None:
+    """Boolean mask for __observed columns (DM / bootstrap indexing)."""
+    if obs is None:
+        return None
+    if hasattr(obs, "fillna"):
+        return obs.fillna(False).to_numpy(dtype=np.bool_)
+    return np.asarray(obs, dtype=np.bool_)
+
+
 def _tune_trees(F, cols, targets, family):
     fit = models.fit_xgboost if family == "xgb" else models.fit_lightgbm
     best_rows = {}
@@ -324,10 +333,11 @@ def stage_train(args):
                     log(f"  fit {name} {target} h={h} n={len(ytr)}")
                     m = fn(Xtr, ytr, Xva, yva, tp) if tp is not None else fn(Xtr, ytr, Xva, yva)
                     preds[name] = m.predict(Xte)
-                    if name == "XGBoost":
+                    if name in ("XGBoost", "LightGBM"):
                         import joblib
+                        tag = "xgb" if name == "XGBoost" else "lgb"
                         joblib.dump(m, os.path.join(
-                            C.OUT_MODELS, f"xgb_{target}_h{h}.joblib"))
+                            C.OUT_MODELS, f"{tag}_{target}_h{h}.joblib"))
             ycol = f"y_{target}_h{h}"
             kinds = (arch,) if arch in DL_KINDS else (DL_KINDS if do_dl else ())
             if kinds:
@@ -352,22 +362,22 @@ def stage_train(args):
                 obs_dl = te_aln.get(f"y_{target}_h{h}__observed")
                 stn_dl = te_aln[C.COL_STATION].values
                 yte_dl = np.array([dte[j][1] for j in range(len(dte))], dtype=float)
+                obs_dl_m = _observed_mask(obs_dl)
                 results[(target, h, kind.upper() if kind != "transformer" else "Transformer")] = (
                     evaluate.evaluate_predictions(
                         yte_dl, preds_dl, persist_dl,
-                        observed_mask=(obs_dl.values if obs_dl is not None else None),
+                        observed_mask=obs_dl_m,
                         stations=stn_dl))
                 import torch
                 torch.save(
                     {"kind": kind, "params": trial, "n_features": len(cols),
                      "state_dict": net.state_dict()},
                     os.path.join(C.OUT_MODELS, f"{kind}_{target}_h{h}.pt"))
-                obs_m = obs_dl.values if obs_dl is not None else None
-                ci = evaluate.block_bootstrap_ci(yte_dl, preds_dl, mask=obs_m)
+                ci = evaluate.block_bootstrap_ci(yte_dl, preds_dl, mask=obs_dl_m)
                 ci_rows.append({"target": target, "horizon_h": h,
                                 "model": kind, "rmse": ci["point"],
                                 "ci_low": ci["ci_low"], "ci_high": ci["ci_high"]})
-            obs_m = obs.values if obs is not None else None
+            obs_m = _observed_mask(obs)
             for name, yhat in preds.items():
                 results[(target, h, name)] = evaluate.evaluate_predictions(
                     yte, yhat, persist,

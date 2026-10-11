@@ -92,7 +92,9 @@ def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: d
         if not os.path.exists(path):
             log(f"  refit {name} {target} h={h} (no joblib)")
     log(f"  refit {name} {target} h={h} n={len(ytr)}")
-    return fit_fn(Xtr, ytr, Xva, yva, tp)
+    m = fit_fn(Xtr, ytr, Xva, yva, tp)
+    joblib.dump(m, path)
+    return m
 
 
 def _test_block(sc, cols, target: str, h: int, cut_test: pd.Timestamp):
