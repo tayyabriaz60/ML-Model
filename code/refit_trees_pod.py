@@ -17,18 +17,24 @@ from src import features, models
 
 HORIZONS = list(C.HORIZONS_MAIN)
 SPECS = (("xgb", models.fit_xgboost), ("lgb", models.fit_lightgbm))
+SCALER_PATH = os.path.join(C.OUT_TABLES, "production_scaler.json")
 
 
 def main() -> int:
     if not os.path.exists(FEAT):
         raise SystemExit(f"missing {FEAT}")
+    if not os.path.exists(SCALER_PATH):
+        raise SystemExit(
+            f"missing {SCALER_PATH} — milestone eval scales with this file; "
+            "refit must use the same scaler, not a fresh fit from _matrices().")
+    sc_prod = models.Scaler.load(SCALER_PATH)
     best = _load_best()
     F = pd.read_parquet(FEAT)
     cols = features.feature_columns(F)
     rows = []
     for target in C.CONFIG.targets:
         for h in HORIZONS:
-            (trn, val, _), _ = _matrices(F, target, h, cols)
+            (trn, val, _), _ = _matrices(F, target, h, cols, scaler=sc_prod)
             for tag, fit_fn in SPECS:
                 key = f"{tag}_{target}"
                 hp = best.get(key) or {}

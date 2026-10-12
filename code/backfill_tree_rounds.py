@@ -22,9 +22,15 @@ def _val_rmse(m, Xva, yva) -> float:
     return float(np.sqrt(np.mean((yva - pred) ** 2)))
 
 
+SCALER_PATH = os.path.join(C.OUT_TABLES, "production_scaler.json")
+
+
 def main() -> int:
     if not os.path.exists(FEAT):
         raise SystemExit(f"missing {FEAT}")
+    if not os.path.exists(SCALER_PATH):
+        raise SystemExit(f"missing {SCALER_PATH}")
+    sc_prod = models.Scaler.load(SCALER_PATH)
     F = pd.read_parquet(FEAT)
     cols = features.feature_columns(F)
     best = _load_best()
@@ -37,7 +43,7 @@ def main() -> int:
             if not row:
                 log(f"skip {key}: no hyperparameters")
                 continue
-            (trn, val, _), _ = _matrices(F, target, 1, cols)
+            (trn, val, _), _ = _matrices(F, target, 1, cols, scaler=sc_prod)
             tp_tune = C.TreeParams(**{k: v for k, v in row.items()
                                       if k in C.TreeParams.__annotations__})
             tp_tune = C.TreeParams(
