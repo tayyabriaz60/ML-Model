@@ -47,8 +47,20 @@ def _production_feature_cols() -> list[str]:
         return list(json.load(f)["params"].keys())
 
 
-def _fit_linear_headline(Xtr, ytr, Xva, yva, max_n: int = 150_000):
-    if len(ytr) > max_n:
+def _linear_max_train_rows() -> int | None:
+    """Headline tables used full train; subsample only for RAM-limited dev runs."""
+    if os.environ.get("REGEN_NO_REFIT", "0") == "1":
+        return None
+    raw = os.environ.get("REGEN_LINEAR_MAX", "150000").strip()
+    if raw.lower() in ("", "0", "none", "full"):
+        return None
+    return int(raw)
+
+
+def _fit_linear_headline(Xtr, ytr, Xva, yva, max_n: int | None = None):
+    if max_n is None:
+        max_n = _linear_max_train_rows()
+    if max_n is not None and len(ytr) > max_n:
         rng = np.random.RandomState(C.SEED)
         idx = rng.choice(len(ytr), max_n, replace=False)
         if hasattr(Xtr, "iloc"):
@@ -57,6 +69,8 @@ def _fit_linear_headline(Xtr, ytr, Xva, yva, max_n: int = 150_000):
             Xtr = Xtr[idx]
         ytr = ytr[idx]
         log(f"  LinearRegression train subsample n={max_n}")
+    elif max_n is None:
+        log(f"  LinearRegression train full n={len(ytr)}")
     return models.fit_linear(Xtr, ytr, Xva, yva)
 
 
