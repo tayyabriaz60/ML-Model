@@ -51,12 +51,20 @@ If **all PASS**: export native format immediately:
 python export_tree_models_json.py   # xgb/lgb → .json under outputs/models/
 ```
 
-If **any FAIL**: refit that model on **full** train (no row cap) using `best_hyperparameters.json`, then save joblib + `.json`.
+If **any FAIL**: run `backfill_tree_rounds.py` (writes `n_estimators` from early-stopping
+best iteration into `best_hyperparameters.json`), then `refit_trees_pod.py` (full train,
+fixed rounds, no early stopping), then re-run pre-flight.
+
+**Root cause (2026-10-12):** JSON stored tuning hyperparameters but not effective tree
+count; pod refit used `n_estimators=2000` + early stopping again, which diverged from
+the 24-trial winners and weakened headline RMSE (e.g. visibility h=1 LightGBM).
 
 ## E. Main eval job (after pre-flight)
 
 ```bash
-python regenerate_headline_eval.py   # pod mode: full train, joblib or refit, target-aware masks
+bash run_pod_eval.sh   # full milestone: backfill rounds → refit → preflight → eval → pack
+# or manually:
+python regenerate_headline_eval.py   # REGEN_TRAIN_CAP=0; tree per-station uses relaxed mask
 python regenerate_dl_headline.py     # LSTM/Transformer pressure h=1 vs reference
 python station_coverage_report.py
 python ci_mask_report.py             # exact equality bootstrap point vs table08

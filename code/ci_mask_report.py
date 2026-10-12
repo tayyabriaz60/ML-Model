@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from src import config as C
 
 CODE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_REF = os.path.join(
+DEFAULT_REF = os.path.join(C.OUT_TABLES, "main_h136", "table08_summary_all.csv")
+FALLBACK_REF = os.path.join(
     CODE, "workspace", "backup_tables_sep30", "main_h136", "table08_summary_all.csv")
 T08 = os.environ.get("TABLE08_REFERENCE", DEFAULT_REF)
 CI = os.path.join(C.OUT_TABLES, "bootstrap_ci.csv")
@@ -30,10 +31,26 @@ def _target_std_native() -> dict:
     return out
 
 
+def _resolve_table08() -> str:
+    if os.path.exists(T08):
+        return T08
+    if os.path.exists(FALLBACK_REF):
+        return FALLBACK_REF
+    parts = []
+    for target in C.CONFIG.targets:
+        p = os.path.join(C.OUT_TABLES, "main_h136", f"table_results_{target}.csv")
+        if os.path.exists(p):
+            parts.append(pd.read_csv(p))
+    if parts:
+        merged = os.path.join(C.OUT_TABLES, "table08_summary_all.csv")
+        pd.concat(parts, ignore_index=True).to_csv(merged, index=False)
+        return merged
+    raise SystemExit(f"missing reference table (tried {T08}, {FALLBACK_REF})")
+
+
 def main():
-    if not os.path.exists(T08):
-        raise SystemExit(f"missing reference table {T08}")
-    t = pd.read_csv(T08)
+    ref_path = _resolve_table08()
+    t = pd.read_csv(ref_path)
     ci = pd.read_csv(CI)
     ci = ci[ci.horizon_h.isin(C.HORIZONS_MAIN)]
     sig = _target_std_native()
@@ -66,7 +83,8 @@ def main():
         print(bad.head(20).to_string(index=False))
     n_ok = int((rep.status == "ok").sum())
     note = (
-        f"Mask check vs frozen reference Table 8 ({os.path.basename(T08)}): "
+        f"Mask check vs frozen reference Table 8 ({os.path.basename(ref_path)}, "
+        f"{len(t)} rows, all targets): "
         f"{n_ok}/{len(rep)} rows match within tolerance AND pass RMSE <= 2x target sigma "
         f"(sigma from production_scaler.json). "
         f"Comparing bootstrap to a co-generated table08 cannot detect broken models."

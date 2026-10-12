@@ -34,6 +34,7 @@ from src import config as C
 from src import data, features, models, evaluate, explain, extremes, ablations, figures
 from src import export_numbers
 from src.trial_store import TrialStore
+from src.tree_rounds import annotate_fixed_rounds, apply_fixed_rounds
 
 CLEAN = os.path.join(C.DATA_PROC, "hourly_clean.parquet")
 FEAT = os.path.join(C.DATA_PROC, "features.parquet")
@@ -82,7 +83,12 @@ def _tree_params(best: dict, family: str, target: str) -> C.TreeParams:
         if k not in row:
             continue
         kw[k] = int(row[k]) if k in ints else float(row[k])
-    return C.TreeParams(**kw) if kw else C.TreeParams()
+    if row.get("use_early_stopping") is False or row.get("fixed_boost_rounds"):
+        kw["early_stopping_rounds"] = 0
+    tp = C.TreeParams(**kw) if kw else C.TreeParams()
+    if row.get("fixed_boost_rounds"):
+        tp = apply_fixed_rounds(tp)
+    return tp
 
 
 # --------------------------------------------------------------------------
@@ -154,8 +160,13 @@ def _tune_trees(F, cols, targets, family):
                 log(f"  {family} {target} trial {i+1}/{n_tr} val RMSE {r['rmse']:.4f}")
         t = pd.DataFrame(rows).sort_values("rmse")
         t.to_csv(os.path.join(C.OUT_TABLES, f"tuning_{family}_{target}.csv"), index=False)
-        best_rows[f"{family}_{target}"] = t.iloc[0].to_dict()
-        log(f"  {target}: {family} search done, best val RMSE {t.rmse.iloc[0]:.4f}")
+        win = t.iloc[0].to_dict()
+        tp_win = C.TreeParams(**{k: v for k, v in win.items()
+                                 if k in C.TreeParams.__annotations__})
+        m_win = fit(trn[0], trn[1], val[0], val[1], tp_win)
+        best_rows[f"{family}_{target}"] = annotate_fixed_rounds(win, m_win, family)
+        log(f"  {target}: {family} search done, best val RMSE {t.rmse.iloc[0]:.4f}, "
+            f"n_estimators={best_rows[f'{family}_{target}'].get('n_estimators')}")
     return best_rows
 
 

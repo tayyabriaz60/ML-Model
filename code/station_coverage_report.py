@@ -16,6 +16,7 @@ import pyarrow.parquet as pq
 from dm_trees_vs_dl import _load_part, _split_cuts
 from run_all import FEAT
 from src import config as C
+from src.eval_masks import eval_row_mask
 
 SCALER_JSON = os.path.join(C.OUT_TABLES, "production_scaler.json")
 OUT_CSV = os.path.join(C.OUT_TABLES, "station_coverage_main_h136.csv")
@@ -58,9 +59,11 @@ def main():
             te = _load_part(cols, [ycol, obs, persist], cut_lo=cut_test)
             all_stations.update(te[C.COL_STATION].unique())
             base = te[ycol].notna() & te[cols].notna().all(axis=1)
+            tree_m = eval_row_mask(te, cols, target, "LightGBM", ycol, obs)
             obs_ok = te[obs] if obs in te.columns else True
             for stn, g in te.groupby(C.COL_STATION):
                 m_eval = base.loc[g.index] & obs_ok.loc[g.index]
+                m_tree = tree_m.loc[g.index]
                 rows.append({
                     "target": target,
                     "horizon_h": h,
@@ -68,15 +71,21 @@ def main():
                     "test_rows_total": len(g),
                     "rows_feature_complete": int(base.loc[g.index].sum()),
                     "rows_observed_target_eval": int(m_eval.sum()),
-                    "included_in_per_station": bool(m_eval.sum() > 0),
+                    "rows_tree_relaxed_eval": int(m_tree.sum()),
+                    "included_in_per_station_trees": bool(m_tree.sum() > 0),
+                    "included_in_per_station_strict": bool(m_eval.sum() > 0),
                 })
     rep = pd.DataFrame(rows)
     rep.to_csv(OUT_CSV, index=False)
     # Stations with zero eval rows in every target-h (dropped everywhere)
-    pivot = rep.groupby("station")["rows_observed_target_eval"].sum()
+    pivot_strict = rep.groupby("station")["rows_observed_target_eval"].sum()
+    pivot_trees = rep.groupby("station")["rows_tree_relaxed_eval"].sum()
     study = sorted(all_stations)
-    active = sorted(pivot[pivot > 0].index)
-    dropped = sorted(set(study) - set(active))
+    active_strict = sorted(pivot_strict[pivot_strict > 0].index)
+    active_trees = sorted(pivot_trees[pivot_trees > 0].index)
+    dropped_strict = sorted(set(study) - set(active_strict))
+    pressure_null_set = set(pressure_null_stns)
+    tree_indicative = sorted(pressure_null_set & set(active_trees))
     lines = [
         f"Study grid stations (features.parquet): {len(study_stations)}",
         f"Stations with >=1 hourly row on or after val/test cut: {len(test_stations)}",
@@ -102,28 +111,41 @@ def main():
         f"Stations with 100% missing {PRESSURE_COL} on the test split: "
         f"{len(pressure_null_stns)}"
         + (f" ({', '.join(pressure_null_stns)})" if pressure_null_stns else ""),
-        "Tree coverage at those sites relies on native NaN handling for the pressure "
-        "block and should be read as indicative (training may not have exposed the "
-        "models to missing pressure in those columns, so the default split direction "
-        "for NaN there is not identified from data).",
+        "Per-station tree metrics (XGBoost/LightGBM) use a relaxed mask for temperature "
+        "and visibility: pressure-block features may be NaN while other inputs are present. "
+        "Headline Table 8 / bootstrap remain on the strict feature-complete mask.",
         "",
-        f"Stations with >=1 observed-target eval row under current report mask (any target-h): "
-        f"{len(active)}",
-        f"Stations with zero observed-target eval rows on all main horizons: {len(dropped)}",
+        f"Stations with >=1 tree relaxed eval row (any target-h): {len(active_trees)}",
+        f"Stations with >=1 strict feature-complete eval row (any target-h): {len(active_strict)}",
+        f"Stations with zero strict eval rows on all main horizons: {len(dropped_strict)}",
         "",
     ])
-    if dropped:
-        lines.append("Dropped stations (zero observed-target rows on h=1,3,6 for all targets):")
-        for stn in dropped:
+    if tree_indicative:
+        lines.append(
+            "Pressure-all-null sites with tree relaxed coverage (indicative only; "
+            "pressure block NaN passed through at predict time):")
+        for stn in tree_indicative:
+            sub = rep[rep.station == stn]
+            lines.append(
+                f"  - {stn}: max tree_relaxed={int(sub.rows_tree_relaxed_eval.max())}, "
+                f"max strict={int(sub.rows_observed_target_eval.max())}")
+        lines.append("")
+    if dropped_strict:
+        lines.append(
+            "Strict-mask dropped stations (zero feature-complete observed-target rows "
+            "on h=1,3,6 for all targets):")
+        for stn in dropped_strict:
+            if stn in tree_indicative:
+                continue
             sub = rep[rep.station == stn]
             lines.append(
                 f"  - {stn}: max test_rows_total={int(sub.test_rows_total.max())}, "
                 f"max feature_complete={int(sub.rows_feature_complete.max())}, "
-                f"max observed_eval={int(sub.rows_observed_target_eval.max())}")
+                f"max strict_eval={int(sub.rows_observed_target_eval.max())}")
     else:
         lines.append(
-            "No station is entirely absent; per-station CSV row count differs by model "
-            "(sequence-aligned DL vs full test grid for trees).")
+            "No station is entirely absent under the strict mask; per-station CSV row "
+            "counts still differ by model (sequence-aligned DL vs tree relaxed grid).")
     note = "\n".join(lines)
     print(note)
     with open(OUT_TXT, "w", encoding="utf-8") as f:

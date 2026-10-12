@@ -156,8 +156,9 @@ def fit_xgboost(Xtr, ytr, Xva, yva, params: C.TreeParams | None = None):
         n_estimators=p.n_estimators, subsample=p.subsample,
         colsample_bytree=p.colsample_bytree, min_child_weight=p.min_child_weight,
         reg_lambda=p.reg_lambda, random_state=p.random_state,
-        early_stopping_rounds=p.early_stopping_rounds,
         tree_method="hist", n_jobs=-1)
+    if p.early_stopping_rounds > 0:
+        kw["early_stopping_rounds"] = p.early_stopping_rounds
     if _cuda_ok():
         kw["device"] = "cuda"
     m = xgb.XGBRegressor(**kw)
@@ -182,14 +183,18 @@ def fit_lightgbm(Xtr, ytr, Xva, yva, params: C.TreeParams | None = None):
     if _cuda_ok():
         kw["device"] = "gpu"
     m = lgb.LGBMRegressor(**kw)
+    fit_kw = {}
+    if p.early_stopping_rounds > 0:
+        fit_kw["callbacks"] = [
+            lgb.early_stopping(p.early_stopping_rounds, verbose=False)]
     try:
-        m.fit(Xtr, ytr, eval_set=[(Xva, yva)],
-              callbacks=[lgb.early_stopping(p.early_stopping_rounds, verbose=False)])
+        m.fit(Xtr, ytr, eval_set=[(Xva, yva)] if p.early_stopping_rounds > 0 else None,
+              **fit_kw)
     except Exception:
         kw.pop("device", None)
         m = lgb.LGBMRegressor(**kw)
-        m.fit(Xtr, ytr, eval_set=[(Xva, yva)],
-              callbacks=[lgb.early_stopping(p.early_stopping_rounds, verbose=False)])
+        m.fit(Xtr, ytr, eval_set=[(Xva, yva)] if p.early_stopping_rounds > 0 else None,
+              **fit_kw)
     return m
 
 

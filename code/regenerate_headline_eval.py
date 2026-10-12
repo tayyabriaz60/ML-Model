@@ -28,6 +28,7 @@ from dm_trees_vs_dl import (
 from run_all import FEAT, _load_best, _tree_params, log
 from src import config as C
 from src import models, evaluate
+from src.eval_masks import eval_row_mask
 
 DL_KINDS = ("lstm", "gru", "transformer")
 HORIZONS = list(C.HORIZONS_MAIN)
@@ -97,6 +98,21 @@ def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: d
     return m
 
 
+def _per_station_trees(m, sc, cols, target: str, h: int, te_raw: pd.DataFrame, model: str):
+    ycol = f"y_{target}_h{h}"
+    obs_col = f"{ycol}__observed"
+    persist_col = f"persist_{target}_h{h}"
+    msk = eval_row_mask(te_raw, cols, target, model, ycol, obs_col)
+    if not msk.any():
+        return None
+    sub = te_raw.loc[msk]
+    yhat = m.predict(sc.transform(sub[cols]))
+    y = sub[ycol].to_numpy(np.float32)
+    persist = sub[persist_col].to_numpy(np.float32)
+    stn = sub[C.COL_STATION].values
+    return evaluate.per_station_metrics(y, yhat, persist, stn)
+
+
 def _test_block(sc, cols, target: str, h: int, cut_test: pd.Timestamp):
     ycol = f"y_{target}_h{h}"
     obs = f"{ycol}__observed"
@@ -137,10 +153,12 @@ def main():
                 sc, cols, target, h, cut_test)
 
             preds = {"Persistence": persist}
+            tree_models = {}
             preds["LinearRegression"] = _fit_linear_headline(
                 trn[0], trn[1], val[0], val[1]).predict(Xte)
             for name, tag in (("XGBoost", "xgb"), ("LightGBM", "lgb")):
                 m = _load_tree_model(name, tag, target, h, trn, val, best)
+                tree_models[name] = m
                 preds[name] = m.predict(Xte)
 
             for kind in DL_KINDS:
@@ -163,9 +181,15 @@ def main():
                 })
 
             for name, yhat in preds.items():
-                results[(target, h, name)] = evaluate.evaluate_predictions(
+                bundle = evaluate.evaluate_predictions(
                     yte, yhat, persist, observed_mask=obs_m, stations=stn,
                     scaler=sc, target_col=tcol)
+                if name in tree_models:
+                    ps = _per_station_trees(
+                        tree_models[name], sc, cols, target, h, te_raw, name)
+                    if ps is not None:
+                        bundle["per_station"] = ps
+                results[(target, h, name)] = bundle
                 ci = evaluate.block_bootstrap_ci(yte, yhat, mask=obs_m)
                 ci_rows.append({
                     "target": target, "horizon_h": h, "model": name,
@@ -178,6 +202,8 @@ def main():
 
     if os.environ.get("REGEN_WRITE_HEADLINE_TABLES", "0") == "1":
         evaluate.results_to_tables(results)
+        import merge_table08
+        merge_table08.main()
     pd.DataFrame(ci_rows).to_csv(os.path.join(C.OUT_TABLES, "bootstrap_ci.csv"),
                                  index=False)
     with open(os.path.join(C.OUT_TABLES, "results_full.json"), "w") as f:

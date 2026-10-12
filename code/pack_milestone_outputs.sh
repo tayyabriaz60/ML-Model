@@ -8,6 +8,12 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING" "$PROJ/deliverables"
 cp "$CODE/outputs/tables/bootstrap_ci.csv" "$STAGING/"
 cp "$CODE/outputs/tables/per_station_metrics.csv" "$STAGING/"
+cp "$CODE/outputs/tables/table08_summary_all.csv" "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/main_h136/table_results_"*.csv "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/tree_refit_audit.txt" "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/tree_rounds_backfill.txt" "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/tree_refit_report.txt" "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/dl_pressure_h1_note.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/table09_regime_shap.csv" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/ci_mask_report.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/station_coverage_note.txt" "$STAGING/" 2>/dev/null || true
