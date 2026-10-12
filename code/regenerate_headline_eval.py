@@ -73,12 +73,37 @@ def _joblib_plausible(m, Xva, yva) -> bool:
     return True
 
 
+def _load_authoritative_table() -> pd.DataFrame | None:
+    """Optional RMSE guard so bootstrap matches frozen table_results (no retrain)."""
+    root = os.environ.get("REGEN_TABLE_ASSERT", "").strip()
+    if not root:
+        return None
+    parts = []
+    for target in C.CONFIG.targets:
+        p = os.path.join(root, f"table_results_{target}.csv")
+        if not os.path.exists(p):
+            raise SystemExit(f"REGEN_TABLE_ASSERT missing {p}")
+        parts.append(pd.read_csv(p))
+    return pd.concat(parts, ignore_index=True)
+
+
+def _expected_rmse(auth: pd.DataFrame | None, target: str, h: int, model: str):
+    if auth is None:
+        return None
+    m = auth[(auth.target == target) & (auth.horizon_h == h)
+             & (auth.model.str.lower() == model.lower())]
+    if len(m) == 0:
+        return None
+    return float(m.iloc[0].RMSE)
+
+
 def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: dict):
     fit_fn = models.fit_xgboost if tag == "xgb" else models.fit_lightgbm
     tp = _tree_params(best, tag, target)
     path = os.path.join(C.OUT_MODELS, f"{tag}_{target}_h{h}.joblib")
     Xtr, ytr = trn[0], trn[1]
     Xva, yva = val[0], val[1]
+    no_refit = os.environ.get("REGEN_NO_REFIT", "0") == "1"
     use_joblib = os.environ.get("REGEN_USE_JOBLIB", "1") != "0"
     if use_joblib and os.path.exists(path):
         try:
@@ -89,6 +114,9 @@ def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: d
             log(f"  {name} joblib failed plausibility on val — refit")
         except Exception as e:
             log(f"  joblib load failed {name} {target} h={h}: {e}; refit")
+    if no_refit:
+        raise SystemExit(
+            f"REGEN_NO_REFIT=1 but no usable joblib for {name} {target} h={h} ({path})")
     else:
         if not os.path.exists(path):
             log(f"  refit {name} {target} h={h} (no joblib)")
@@ -117,17 +145,15 @@ def _test_block(sc, cols, target: str, h: int, cut_test: pd.Timestamp):
     ycol = f"y_{target}_h{h}"
     obs = f"{ycol}__observed"
     persist = f"persist_{target}_h{h}"
-    te = _load_part(cols, [ycol, obs, persist], cut_lo=cut_test)
-    m = te[ycol].notna() & te[cols].notna().all(axis=1)
-    te_ok = te.loc[m]
+    te_full = _load_part(cols, [ycol, obs, persist], cut_lo=cut_test)
+    m = te_full[ycol].notna() & te_full[cols].notna().all(axis=1)
+    te_ok = te_full.loc[m]
     Xte = sc.transform(te_ok[cols])
     yte = te_ok[ycol].to_numpy(np.float32)
     persist_v = te_ok[persist].to_numpy(np.float32)
     obs_m = te_ok[obs].values.astype(bool) if obs in te_ok.columns else None
     stn = te_ok[C.COL_STATION].values
-    del te
-    gc.collect()
-    return Xte, yte, persist_v, obs_m, stn, te_ok
+    return Xte, yte, persist_v, obs_m, stn, te_full
 
 
 def main():
@@ -141,6 +167,7 @@ def main():
     best = _load_best()
     tcol_map = C.TARGETS
     results, ci_rows = {}, []
+    auth_table = _load_authoritative_table()
 
     for target in C.CONFIG.targets:
         tcol = tcol_map[target]
@@ -173,7 +200,17 @@ def main():
                 results[(target, h, label)] = evaluate.evaluate_predictions(
                     y_dl, yhat, persist_dl, observed_mask=obs_dl_m,
                     stations=te_aln[C.COL_STATION].values)
+                exp_dl = _expected_rmse(auth_table, target, h, label)
+                obs_dl = results[(target, h, label)].get(
+                    "observed_targets_only", results[(target, h, label)]["all_rows"])
+                if exp_dl is not None and round(float(obs_dl["rmse"]), 4) != round(exp_dl, 4):
+                    raise SystemExit(
+                        f"RMSE mismatch {target} h={h} {label}: "
+                        f"eval={round(float(obs_dl['rmse']), 4)} table={round(exp_dl, 4)}")
                 ci = evaluate.block_bootstrap_ci(y_dl, yhat, mask=obs_dl_m)
+                if exp_dl is not None and round(ci["point"], 4) != round(exp_dl, 4):
+                    raise SystemExit(
+                        f"bootstrap point mismatch {target} h={h} {label}")
                 ci_rows.append({
                     "target": target, "horizon_h": h, "model": label,
                     "rmse": ci["point"], "ci_low": ci["ci_low"],
@@ -189,8 +226,21 @@ def main():
                         tree_models[name], sc, cols, target, h, te_raw, name)
                     if ps is not None:
                         bundle["per_station"] = ps
+                elif name == "LinearRegression":
+                    bundle.pop("per_station", None)
                 results[(target, h, name)] = bundle
+                obs = bundle.get("observed_targets_only", bundle["all_rows"])
+                got_rmse = round(float(obs["rmse"]), 4)
+                exp = _expected_rmse(auth_table, target, h, name)
+                if exp is not None and got_rmse != round(exp, 4):
+                    raise SystemExit(
+                        f"RMSE mismatch {target} h={h} {name}: "
+                        f"eval={got_rmse} table={round(exp, 4)} — wrong joblib or refit needed")
                 ci = evaluate.block_bootstrap_ci(yte, yhat, mask=obs_m)
+                if exp is not None and round(ci["point"], 4) != round(exp, 4):
+                    raise SystemExit(
+                        f"bootstrap point mismatch {target} h={h} {name}: "
+                        f"ci={round(ci['point'], 4)} table={round(exp, 4)}")
                 ci_rows.append({
                     "target": target, "horizon_h": h, "model": name,
                     "rmse": ci["point"], "ci_low": ci["ci_low"],

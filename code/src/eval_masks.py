@@ -36,7 +36,7 @@ def eval_row_mask(
     """Boolean Series aligned to ``frame.index``."""
     m = frame[ycol].notna()
     if obs_col and obs_col in frame.columns:
-        m &= frame[obs_col].fillna(False)
+        m &= frame[obs_col].fillna(False).astype(bool)
     need = required_feature_columns(cols, target, model)
     if need:
         m &= frame[need].notna().all(axis=1)
