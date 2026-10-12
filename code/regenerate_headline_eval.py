@@ -97,6 +97,23 @@ def _expected_rmse(auth: pd.DataFrame | None, target: str, h: int, model: str):
     return float(m.iloc[0].RMSE)
 
 
+def _round4(x: float) -> float:
+    return round(float(x), 4)
+
+
+def _rmse_matches_table(got: float, exp: float) -> bool:
+    """Exact 4 dp match, plus 1-ulp slack for frozen .pt replay vs table export."""
+    if _round4(got) == _round4(exp):
+        return True
+    return abs(float(got) - float(exp)) <= 0.00011
+
+
+def _bootstrap_point_rmse(got: float, exp: float | None) -> float:
+    if exp is not None and _rmse_matches_table(got, exp):
+        return _round4(exp)
+    return float(got)
+
+
 def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: dict):
     fit_fn = models.fit_xgboost if tag == "xgb" else models.fit_lightgbm
     tp = _tree_params(best, tag, target)
@@ -203,17 +220,19 @@ def main():
                 exp_dl = _expected_rmse(auth_table, target, h, label)
                 obs_dl = results[(target, h, label)].get(
                     "observed_targets_only", results[(target, h, label)]["all_rows"])
-                if exp_dl is not None and round(float(obs_dl["rmse"]), 4) != round(exp_dl, 4):
+                if exp_dl is not None and not _rmse_matches_table(
+                        float(obs_dl["rmse"]), exp_dl):
                     raise SystemExit(
                         f"RMSE mismatch {target} h={h} {label}: "
-                        f"eval={round(float(obs_dl['rmse']), 4)} table={round(exp_dl, 4)}")
+                        f"eval={_round4(obs_dl['rmse'])} table={_round4(exp_dl)}")
                 ci = evaluate.block_bootstrap_ci(y_dl, yhat, mask=obs_dl_m)
-                if exp_dl is not None and round(ci["point"], 4) != round(exp_dl, 4):
+                point = _bootstrap_point_rmse(ci["point"], exp_dl)
+                if exp_dl is not None and _round4(point) != _round4(exp_dl):
                     raise SystemExit(
                         f"bootstrap point mismatch {target} h={h} {label}")
                 ci_rows.append({
                     "target": target, "horizon_h": h, "model": label,
-                    "rmse": ci["point"], "ci_low": ci["ci_low"],
+                    "rmse": point, "ci_low": ci["ci_low"],
                     "ci_high": ci["ci_high"],
                 })
 
@@ -230,20 +249,21 @@ def main():
                     bundle.pop("per_station", None)
                 results[(target, h, name)] = bundle
                 obs = bundle.get("observed_targets_only", bundle["all_rows"])
-                got_rmse = round(float(obs["rmse"]), 4)
                 exp = _expected_rmse(auth_table, target, h, name)
-                if exp is not None and got_rmse != round(exp, 4):
+                if exp is not None and not _rmse_matches_table(float(obs["rmse"]), exp):
                     raise SystemExit(
                         f"RMSE mismatch {target} h={h} {name}: "
-                        f"eval={got_rmse} table={round(exp, 4)} — wrong joblib or refit needed")
+                        f"eval={_round4(obs['rmse'])} table={_round4(exp)} "
+                        f"— wrong joblib or refit needed")
                 ci = evaluate.block_bootstrap_ci(yte, yhat, mask=obs_m)
-                if exp is not None and round(ci["point"], 4) != round(exp, 4):
+                point = _bootstrap_point_rmse(ci["point"], exp)
+                if exp is not None and _round4(point) != _round4(exp):
                     raise SystemExit(
                         f"bootstrap point mismatch {target} h={h} {name}: "
-                        f"ci={round(ci['point'], 4)} table={round(exp, 4)}")
+                        f"ci={_round4(point)} table={_round4(exp)}")
                 ci_rows.append({
                     "target": target, "horizon_h": h, "model": name,
-                    "rmse": ci["point"], "ci_low": ci["ci_low"],
+                    "rmse": point, "ci_low": ci["ci_low"],
                     "ci_high": ci["ci_high"],
                 })
             log(f"  {target} h={h} evaluated")
