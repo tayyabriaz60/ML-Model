@@ -122,10 +122,33 @@ def _rmse_matches_table(got: float, exp: float) -> bool:
     return abs(float(got) - float(exp)) <= 0.00011
 
 
+def _honest_bootstrap() -> bool:
+    """Bootstrap CSV rmse must come from block_bootstrap on the same preds as tables."""
+    return os.environ.get("REGEN_HONEST_BOOTSTRAP", "0") == "1"
+
+
+def _strict_table_preds(model: str) -> bool:
+    """Trees/LR/persistence must match table preds; DL may snap on frozen .pt replay."""
+    return _honest_bootstrap() and not _is_dl_model(model)
+
+
 def _bootstrap_point_rmse(got: float, exp: float | None) -> float:
     if exp is not None and _rmse_matches_table(got, exp):
         return _round4(exp)
     return float(got)
+
+
+def _ci_bootstrap_point(ci_point: float, exp: float | None) -> float:
+    point = _round4(ci_point)
+    if exp is None:
+        return point
+    if _honest_bootstrap():
+        if _round4(point) != _round4(exp):
+            raise SystemExit(
+                f"honest bootstrap: ci point {_round4(point)} != table {_round4(exp)} "
+                f"— predictions differ from table_results joblib/checkpoint")
+        return point
+    return _bootstrap_point_rmse(ci_point, exp)
 
 
 def _is_dl_model(label: str) -> bool:
@@ -133,7 +156,6 @@ def _is_dl_model(label: str) -> bool:
 
 
 def _dl_bootstrap_point_rmse(ci_point: float, exp: float | None, label: str) -> float:
-    """Frozen .pt replay on a new stack can differ slightly from table export RMSE."""
     if exp is None:
         return float(ci_point)
     if _rmse_matches_table(ci_point, exp):
@@ -157,7 +179,12 @@ def _table_sync_fatal_mismatch(got: float, exp: float) -> bool:
 def _headline_bootstrap_point_rmse(
     ci_point: float, headline_rmse: float, exp: float | None, model: str,
 ) -> float:
-    """Parity uses bootstrap_ci.rmse; main_h136 table is authoritative when asserted."""
+    if _strict_table_preds(model):
+        if exp is not None and not _rmse_matches_table(headline_rmse, exp):
+            raise SystemExit(
+                f"honest bootstrap {model}: headline eval {_round4(headline_rmse)} "
+                f"!= table {_round4(exp)} — use table-matching joblib, not pod refit")
+        return _ci_bootstrap_point(ci_point, exp)
     if exp is None:
         return float(ci_point)
     if _rmse_matches_table(ci_point, exp) or _rmse_matches_table(headline_rmse, exp):
@@ -314,7 +341,7 @@ def main():
                 exp = _expected_rmse(auth_table, target, h, name)
                 got_h = float(obs["rmse"])
                 if exp is not None and not _rmse_matches_table(got_h, exp):
-                    if _table_sync_fatal_mismatch(got_h, exp):
+                    if _strict_table_preds(name) or _table_sync_fatal_mismatch(got_h, exp):
                         raise SystemExit(
                             f"RMSE mismatch {target} h={h} {name}: "
                             f"eval={_round4(got_h)} table={_round4(exp)} "

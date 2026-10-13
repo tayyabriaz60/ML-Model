@@ -62,10 +62,14 @@ def main() -> int:
     rep = pd.DataFrame(rows)
     n_ok = int((rep.status == "ok").sum())
     n = len(rep)
+    by_target = rep.groupby("target").size().to_dict()
     header = (
         f"Bootstrap vs authoritative table_results (exact to 4 decimals): "
         f"{n_ok}/{n} ok\n"
         f"Reference dir: {os.environ.get('TABLE_RESULTS_DIR', 'main_h136')}\n"
+        f"Rows per target: {by_target}\n"
+        f"REGEN_HONEST_BOOTSTRAP={os.environ.get('REGEN_HONEST_BOOTSTRAP', 'unset')} "
+        f"(1 = bootstrap rmse from block_bootstrap on same preds as tables)\n"
     )
     bad = rep[rep.status != "ok"]
     print(header + rep.groupby("status").size().to_string())

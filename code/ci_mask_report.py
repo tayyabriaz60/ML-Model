@@ -46,10 +46,12 @@ def main():
     rep = pd.DataFrame(rows, columns=[
         "target", "h", "model", "table_rmse", "bootstrap_rmse", "status"])
     n_ok = int((rep.status == "ok").sum())
+    by_target = rep.groupby("target").size().to_dict()
     note = (
         f"Bootstrap vs authoritative table_results ({len(ref)} rows, all targets): "
         f"{n_ok}/{len(rep)} exact RMSE match (4 dp). "
-        f"Reference: {os.environ.get('TABLE_RESULTS_DIR', 'main_h136')}."
+        f"Reference: {os.environ.get('TABLE_RESULTS_DIR', 'main_h136')}.\n"
+        f"Rows per target: {by_target} (expect 21 each for 3 targets x 7 models x h=1,3,6)."
     )
     print(note)
     print(rep.groupby("status").size().to_string())

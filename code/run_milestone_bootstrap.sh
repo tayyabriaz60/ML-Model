@@ -5,6 +5,7 @@ cd "$(dirname "$0")"
 export REGEN_TRAIN_CAP=0
 export REGEN_USE_JOBLIB=1
 export REGEN_NO_REFIT=1
+export REGEN_HONEST_BOOTSTRAP="${REGEN_HONEST_BOOTSTRAP:-1}"
 export REGEN_WRITE_HEADLINE_TABLES=0
 export REGEN_TABLE_ASSERT="${REGEN_TABLE_ASSERT:-$(pwd)/outputs/tables/main_h136}"
 export TABLE_RESULTS_DIR="${TABLE_RESULTS_DIR:-$(pwd)/outputs/tables/main_h136}"
