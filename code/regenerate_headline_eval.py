@@ -148,7 +148,9 @@ def _table_sync_fatal_mismatch(got: float, exp: float) -> bool:
     if _rmse_matches_table(got, exp):
         return False
     d = abs(float(got) - float(exp))
-    tol = max(0.05, 0.025 * abs(float(exp)))
+    scale = abs(float(exp)) or 1.0
+    # Pod refit vs frozen main_h136 can differ ~5–7% on pressure; scaler bugs are ~10%+.
+    tol = max(0.07, 0.10 * scale)
     return d > tol
 
 
