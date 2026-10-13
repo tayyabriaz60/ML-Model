@@ -16,5 +16,6 @@ python station_coverage_report.py
 python ci_mask_report.py
 python write_dl_pressure_h1_note.py
 python h1_xgb_lgb_ci_overlap.py
+python verify_milestone_acceptance.py
 bash pack_milestone_outputs.sh
-echo "DONE — parity report must show 63/63 ok"
+echo "DONE — parity report must show 63/63 ok and milestone_acceptance_report.txt all PASS"

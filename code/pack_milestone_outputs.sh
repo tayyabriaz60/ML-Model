@@ -17,6 +17,7 @@ cp "$CODE/outputs/tables/dl_pressure_h1_note.txt" "$STAGING/" 2>/dev/null || tru
 cp "$CODE/outputs/tables/table09_regime_shap.csv" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/ci_mask_report.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/bootstrap_table_parity_report.txt" "$STAGING/" 2>/dev/null || true
+cp "$CODE/outputs/tables/milestone_acceptance_report.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/station_coverage_note.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/station_coverage_main_h136.csv" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/tree_preflight_report.txt" "$STAGING/" 2>/dev/null || true

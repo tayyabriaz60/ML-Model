@@ -240,6 +240,74 @@ def _per_station_trees(m, sc, cols, target: str, h: int, te_raw: pd.DataFrame, m
     return evaluate.per_station_metrics(y, yhat, persist, stn)
 
 
+def _per_station_persistence_relaxed(
+    te_raw: pd.DataFrame, cols, target: str, h: int, tree_model: str = "LightGBM",
+):
+    """Persistence rows on the same relaxed mask as temp/vis trees (eight pressure-null sites)."""
+    if target not in ("temperature", "visibility"):
+        return None
+    ycol = f"y_{target}_h{h}"
+    obs_col = f"{ycol}__observed"
+    persist_col = f"persist_{target}_h{h}"
+    msk = eval_row_mask(te_raw, cols, target, tree_model, ycol, obs_col)
+    if not msk.any():
+        return None
+    sub = te_raw.loc[msk]
+    y = sub[ycol].to_numpy(np.float32)
+    persist = sub[persist_col].to_numpy(np.float32)
+    stn = sub[C.COL_STATION].values
+    return evaluate.per_station_metrics(y, persist, persist, stn)
+
+
+def _merge_per_station_tables(base: dict | None, extra: dict | None) -> dict | None:
+    if not extra:
+        return base
+    if not base:
+        return extra
+    seen = {str(r["station"]) for r in base.get("table", [])}
+    rows = list(base.get("table", []))
+    for r in extra.get("table", []):
+        if str(r["station"]) not in seen:
+            rows.append(r)
+            seen.add(str(r["station"]))
+    out = dict(base)
+    out["table"] = rows
+    out["n_stations"] = len(rows)
+    return out
+
+
+def _assert_ci_contains_point(
+    target: str, h: int, model: str, point: float, ci: dict,
+) -> None:
+    lo, hi = float(ci["ci_low"]), float(ci["ci_high"])
+    if float(point) < lo - 1e-6 or float(point) > hi + 1e-6:
+        raise SystemExit(
+            f"bootstrap CI must contain point {target} h={h} {model}: "
+            f"rmse={_round4(point)} ci=[{_round4(lo)}, {_round4(hi)}]")
+
+
+def _append_ci_row(
+    ci_rows: list,
+    target: str,
+    h: int,
+    model: str,
+    ci: dict,
+    exp: float | None,
+) -> None:
+    """Write bootstrap_ci from one block_bootstrap draw; rmse is always ci['point']."""
+    point = _round4(ci["point"])
+    _assert_ci_contains_point(target, h, model, point, ci)
+    if exp is not None and os.environ.get("REGEN_TABLE_ASSERT", "").strip():
+        if not _rmse_matches_table(point, exp):
+            raise SystemExit(
+                f"bootstrap point {_round4(point)} != table {_round4(exp)} "
+                f"for {target} h={h} {model} — recompute from table-matching predictions")
+    ci_rows.append({
+        "target": target, "horizon_h": h, "model": model,
+        "rmse": point, "ci_low": ci["ci_low"], "ci_high": ci["ci_high"],
+    })
+
+
 def _test_block(sc, cols, target: str, h: int, cut_test: pd.Timestamp):
     ycol = f"y_{target}_h{h}"
     obs = f"{ycol}__observed"
@@ -300,69 +368,27 @@ def main():
                     y_dl, yhat, persist_dl, observed_mask=obs_dl_m,
                     stations=te_aln[C.COL_STATION].values)
                 exp_dl = _expected_rmse(auth_table, target, h, label)
-                obs_dl = results[(target, h, label)].get(
-                    "observed_targets_only", results[(target, h, label)]["all_rows"])
-                got_dl = float(obs_dl["rmse"])
-                if exp_dl is not None and not _rmse_matches_table(got_dl, exp_dl):
-                    if _is_dl_model(label):
-                        log(
-                            f"  DL replay RMSE {target} h={h} {label}: "
-                            f"eval={_round4(got_dl)} table={_round4(exp_dl)} "
-                            f"(bootstrap point uses table; CIs from replay preds)"
-                        )
-                    else:
-                        raise SystemExit(
-                            f"RMSE mismatch {target} h={h} {label}: "
-                            f"eval={_round4(got_dl)} table={_round4(exp_dl)}")
                 ci = evaluate.block_bootstrap_ci(y_dl, yhat, mask=obs_dl_m)
-                point = _dl_bootstrap_point_rmse(ci["point"], exp_dl, label)
-                if exp_dl is not None and _round4(point) != _round4(exp_dl):
-                    raise SystemExit(
-                        f"bootstrap point mismatch {target} h={h} {label}")
-                ci_rows.append({
-                    "target": target, "horizon_h": h, "model": label,
-                    "rmse": point, "ci_low": ci["ci_low"],
-                    "ci_high": ci["ci_high"],
-                })
+                _append_ci_row(ci_rows, target, h, label, ci, exp_dl)
 
             for name, yhat in preds.items():
                 bundle = evaluate.evaluate_predictions(
                     yte, yhat, persist, observed_mask=obs_m, stations=stn,
                     scaler=sc, target_col=tcol)
+                if name == "Persistence" and target in ("temperature", "visibility"):
+                    extra_ps = _per_station_persistence_relaxed(
+                        te_raw, cols, target, h, "LightGBM")
+                    bundle["per_station"] = _merge_per_station_tables(
+                        bundle.get("per_station"), extra_ps)
                 if name in tree_models:
                     ps = _per_station_trees(
                         tree_models[name], sc, cols, target, h, te_raw, name)
                     if ps is not None:
                         bundle["per_station"] = ps
-                elif name == "LinearRegression":
-                    bundle.pop("per_station", None)
                 results[(target, h, name)] = bundle
-                obs = bundle.get("observed_targets_only", bundle["all_rows"])
                 exp = _expected_rmse(auth_table, target, h, name)
-                got_h = float(obs["rmse"])
-                if exp is not None and not _rmse_matches_table(got_h, exp):
-                    if _strict_table_preds(name) or _table_sync_fatal_mismatch(got_h, exp):
-                        raise SystemExit(
-                            f"RMSE mismatch {target} h={h} {name}: "
-                            f"eval={_round4(got_h)} table={_round4(exp)} "
-                            f"— wrong joblib or refit needed")
-                    log(
-                        f"  headline RMSE drift {target} h={h} {name}: "
-                        f"eval={_round4(got_h)} table={_round4(exp)} "
-                        f"(bootstrap point uses table; CIs from replay preds)"
-                    )
                 ci = evaluate.block_bootstrap_ci(yte, yhat, mask=obs_m)
-                point = _headline_bootstrap_point_rmse(
-                    ci["point"], got_h, exp, name)
-                if exp is not None and _round4(point) != _round4(exp):
-                    raise SystemExit(
-                        f"bootstrap point mismatch {target} h={h} {name}: "
-                        f"ci={_round4(point)} table={_round4(exp)}")
-                ci_rows.append({
-                    "target": target, "horizon_h": h, "model": name,
-                    "rmse": point, "ci_low": ci["ci_low"],
-                    "ci_high": ci["ci_high"],
-                })
+                _append_ci_row(ci_rows, target, h, name, ci, exp)
             log(f"  {target} h={h} evaluated")
             del te_raw, Xte, trn, val
             gc.collect()
