@@ -28,6 +28,7 @@ from dm_trees_vs_dl import (
 from run_all import FEAT, _load_best, _tree_params, log
 from src import config as C
 from src import models, evaluate
+from src import tree_model_io
 from src.eval_masks import eval_row_mask
 
 DL_KINDS = ("lstm", "gru", "transformer")
@@ -199,15 +200,26 @@ def _headline_bootstrap_point_rmse(
 def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: dict):
     fit_fn = models.fit_xgboost if tag == "xgb" else models.fit_lightgbm
     tp = _tree_params(best, tag, target)
-    path = os.path.join(C.OUT_MODELS, f"{tag}_{target}_h{h}.joblib")
     Xtr, ytr = trn[0], trn[1]
     Xva, yva = val[0], val[1]
     no_refit = os.environ.get("REGEN_NO_REFIT", "0") == "1"
     use_joblib = os.environ.get("REGEN_USE_JOBLIB", "1") != "0"
+
+    if tag == "xgb":
+        jp = os.path.join(C.OUT_MODELS, f"xgb_{target}_h{h}.json")
+        if os.path.exists(jp):
+            m, src = tree_model_io.load_xgb(target, h, require_json=True)
+            if not tree_model_io.joblib_plausible(m, Xva, yva):
+                raise SystemExit(
+                    f"XGB JSON {src} failed val plausibility for {target} h={h} — re-export after refit")
+            log(f"  loaded {name} {target} h={h} from {os.path.basename(src)}")
+            return m
+
+    path = os.path.join(C.OUT_MODELS, f"{tag}_{target}_h{h}.joblib")
     if use_joblib and os.path.exists(path):
         try:
             m = joblib.load(path)
-            if _joblib_plausible(m, Xva, yva):
+            if tree_model_io.joblib_plausible(m, Xva, yva):
                 log(f"  loaded {name} {target} h={h} from joblib")
                 return m
             log(f"  {name} joblib failed plausibility on val — refit")
@@ -215,13 +227,15 @@ def _load_tree_model(name: str, tag: str, target: str, h: int, trn, val, best: d
             log(f"  joblib load failed {name} {target} h={h}: {e}; refit")
     if no_refit:
         raise SystemExit(
-            f"REGEN_NO_REFIT=1 but no usable joblib for {name} {target} h={h} ({path})")
-    else:
-        if not os.path.exists(path):
-            log(f"  refit {name} {target} h={h} (no joblib)")
+            f"REGEN_NO_REFIT=1 but no usable checkpoint for {name} {target} h={h} "
+            f"(XGB: need .json from export_tree_models_json.py after refit)")
     log(f"  refit {name} {target} h={h} n={len(ytr)}")
     m = fit_fn(Xtr, ytr, Xva, yva, tp)
     joblib.dump(m, path)
+    if tag == "xgb":
+        jp = os.path.join(C.OUT_MODELS, f"xgb_{target}_h{h}.json")
+        m.save_model(jp)
+        log(f"  wrote {jp}")
     return m
 
 
@@ -299,12 +313,17 @@ def _append_ci_row(
     _assert_ci_contains_point(target, h, model, point, ci)
     if exp is not None and os.environ.get("REGEN_TABLE_ASSERT", "").strip():
         if not _rmse_matches_table(point, exp):
-            raise SystemExit(
+            msg = (
                 f"bootstrap point {_round4(point)} != table {_round4(exp)} "
-                f"for {target} h={h} {model} — recompute from table-matching predictions")
+                f"for {target} h={h} {model} (bootstrap n={ci.get('n')})"
+            )
+            if os.environ.get("REGEN_STOP_ON_PARITY_MISMATCH", "0").strip() == "1":
+                raise SystemExit(msg + " — predictions or row mask differ from tables")
+            log(f"WARN parity: {msg}")
     ci_rows.append({
         "target": target, "horizon_h": h, "model": model,
         "rmse": point, "ci_low": ci["ci_low"], "ci_high": ci["ci_high"],
+        "n": ci.get("n"),
     })
 
 

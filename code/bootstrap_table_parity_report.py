@@ -51,12 +51,16 @@ def main() -> int:
         else:
             exact = round(boot, 4) == round(tbl, 4)
             st = "ok" if exact else "MISMATCH"
+        table_n = int(r.n) if "n" in r.index and pd.notna(r.n) else None
+        boot_n = int(m.iloc[0].n) if len(m) and "n" in m.columns and pd.notna(m.iloc[0].n) else None
         rows.append({
             "target": r.target,
             "horizon_h": r.horizon_h,
             "model": r.model,
             "table_rmse": tbl,
             "bootstrap_rmse": boot,
+            "table_n": table_n,
+            "bootstrap_n": boot_n,
             "status": st,
         })
     rep = pd.DataFrame(rows)
@@ -74,8 +78,10 @@ def main() -> int:
     bad = rep[rep.status != "ok"]
     print(header + rep.groupby("status").size().to_string())
     if len(bad):
-        print("\nMismatches:")
-        print(bad.to_string(index=False))
+        print("\nMismatches (compare table_n vs bootstrap_n if RMSE differs):")
+        cols = [c for c in ("target", "horizon_h", "model", "table_rmse", "bootstrap_rmse",
+                            "table_n", "bootstrap_n", "status") if c in bad.columns]
+        print(bad[cols].to_string(index=False))
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(header)
         f.write(rep.to_csv(index=False))

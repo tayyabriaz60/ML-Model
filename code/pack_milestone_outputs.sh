@@ -8,8 +8,18 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING" "$PROJ/deliverables"
 cp "$CODE/outputs/tables/bootstrap_ci.csv" "$STAGING/"
 cp "$CODE/outputs/tables/per_station_metrics.csv" "$STAGING/"
-cp "$CODE/outputs/tables/table08_summary_all.csv" "$STAGING/" 2>/dev/null || true
-cp "$CODE/outputs/tables/main_h136/table_results_"*.csv "$STAGING/" 2>/dev/null || true
+if [[ -f "$CODE/outputs/tables/table08_summary_all.csv" ]]; then
+  cp "$CODE/outputs/tables/table08_summary_all.csv" "$STAGING/"
+elif [[ -f "$CODE/outputs/tables/main_h136/table08_summary_all.csv" ]]; then
+  cp "$CODE/outputs/tables/main_h136/table08_summary_all.csv" "$STAGING/"
+else
+  echo "WARN: missing table08_summary_all.csv in outputs/tables" >&2
+fi
+if compgen -G "$CODE/outputs/tables/table_results_"*.csv >/dev/null; then
+  cp "$CODE/outputs/tables/table_results_"*.csv "$STAGING/"
+else
+  cp "$CODE/outputs/tables/main_h136/table_results_"*.csv "$STAGING/" 2>/dev/null || true
+fi
 cp "$CODE/outputs/tables/tree_refit_audit.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/tree_rounds_backfill.txt" "$STAGING/" 2>/dev/null || true
 cp "$CODE/outputs/tables/tree_refit_report.txt" "$STAGING/" 2>/dev/null || true

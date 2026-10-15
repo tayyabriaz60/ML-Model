@@ -147,7 +147,7 @@ def block_bootstrap_ci(y_true, y_pred, stat="rmse", n_boot=C.BOOTSTRAP_N,
     lo, hi = np.percentile(vals, [(1 - level) / 2 * 100, (1 + level) / 2 * 100])
     return {"stat": stat, "point": _metrics(y, yhat)[stat],
             "ci_low": float(lo), "ci_high": float(hi),
-            "level": level, "n_boot": n_boot, "block_h": block}
+            "level": level, "n_boot": n_boot, "block_h": block, "n": n}
 
 
 # --------------------------------------------------------------------------

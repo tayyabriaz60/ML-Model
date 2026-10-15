@@ -13,6 +13,7 @@ from src import config as C
 CI = os.path.join(C.OUT_TABLES, "bootstrap_ci.csv")
 PS = os.path.join(C.OUT_TABLES, "per_station_metrics.csv")
 PARITY = os.path.join(C.OUT_TABLES, "bootstrap_table_parity_report.txt")
+PREFLIGHT = os.path.join(C.OUT_TABLES, "tree_preflight_report.txt")
 OUT = os.path.join(C.OUT_TABLES, "milestone_acceptance_report.txt")
 FAMILIES = (
     "Persistence", "LinearRegression", "XGBoost", "LightGBM",
@@ -51,6 +52,22 @@ def _check_parity(ci: pd.DataFrame) -> tuple[int, int]:
     return n_ok, len(ref)
 
 
+def _check_preflight() -> tuple[int, int, str]:
+    """18/18 = plausible trees loaded (XGB from .json); not FAIL / LOAD_ERR."""
+    if not os.path.exists(PREFLIGHT):
+        return 0, 18, "missing tree_preflight_report.txt"
+    text = open(PREFLIGHT, encoding="utf-8").read()
+    first = text.split("\n", 1)[0].strip()
+    # Prefer explicit summary line from pod_tree_preflight.py
+    if "tree preflight:" in first and "/18" in first:
+        import re
+        m = re.search(r"tree preflight:\s*(\d+)/18", first)
+        if m:
+            n = int(m.group(1))
+            return n, 18, first
+    return 0, 18, first or "unparsed preflight report"
+
+
 def _check_families(ps: pd.DataFrame) -> tuple[bool, list[str]]:
     missing = []
     for target in C.CONFIG.targets:
@@ -72,11 +89,14 @@ def main() -> int:
     n_ci_ok, ci_bad = _check_ci_contains(ci)
     n_par, n_ref = _check_parity(ci)
     fam_ok, fam_miss = _check_families(ps)
+    n_pf, n_pf_ref, pf_line = _check_preflight()
+    pf_ok = n_pf == n_pf_ref
     lines = [
         "Milestone acceptance (client T5.R1)",
         f"1) CI contains point: {n_ci_ok}/{len(ci)} ok",
         f"2) Bootstrap RMSE vs table_results: {n_par}/{n_ref} exact (4 dp)",
         f"3) per_station seven families each target-h: {'PASS' if fam_ok else 'FAIL'}",
+        f"4) Tree preflight: {n_pf}/{n_pf_ref} {'PASS' if pf_ok else 'FAIL'} — {pf_line}",
         "",
     ]
     if len(ci_bad):
@@ -90,7 +110,7 @@ def main() -> int:
     print(text)
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(text)
-    ok = (n_ci_ok == len(ci) and n_par == n_ref and fam_ok)
+    ok = (n_ci_ok == len(ci) and n_par == n_ref and fam_ok and pf_ok)
     return 0 if ok else 1
 
 

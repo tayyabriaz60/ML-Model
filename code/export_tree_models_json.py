@@ -35,8 +35,10 @@ def main():
                 out = os.path.join(C.OUT_MODELS, f"{tag}_{target}_h{h}.json")
                 if tag == "xgb":
                     _save_xgb(m, out)
-                else:
+                elif os.environ.get("EXPORT_LGB_JSON", "0") == "1":
                     _save_lgb(m, out)
+                else:
+                    continue
                 print(f"wrote {out}")
                 n += 1
     print(f"exported {n} json models")

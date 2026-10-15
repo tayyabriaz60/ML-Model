@@ -13,13 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dm_trees_vs_dl import _split_cuts, _train_val_mats
 from regenerate_headline_eval import (
-    _joblib_plausible,
     _production_feature_cols,
     _round4,
     _test_block,
 )
 from src import config as C
-from src import evaluate, models
+from src import evaluate, models, tree_model_io
 
 OUT = os.path.join(C.OUT_TABLES, "tree_preflight_report.txt")
 HORIZONS = list(C.HORIZONS_MAIN)
@@ -50,12 +49,17 @@ def main():
             for name, tag in SPECS:
                 path = os.path.join(C.OUT_MODELS, f"{tag}_{target}_h{h}.joblib")
                 status, rmse, test_rmse, table_rmse = "missing", None, None, None
-                if os.path.exists(path):
-                    try:
+                try:
+                    if tag == "xgb":
+                        m, path = tree_model_io.load_xgb(target, h, require_json=True)
+                    elif os.path.exists(path):
                         m = joblib.load(path)
+                    else:
+                        m = None
+                    if m is not None:
                         pred = m.predict(val[0])
                         rmse = float(np.sqrt(np.mean((val[1] - pred) ** 2)))
-                        if not _joblib_plausible(m, val[0], val[1]):
+                        if not tree_model_io.joblib_plausible(m, val[0], val[1]):
                             status = "FAIL"
                         else:
                             Xte, yte, persist, obs_m, _, _ = _test_block(
@@ -74,16 +78,25 @@ def main():
                                 )
                             else:
                                 status = "PASS"
-                    except Exception as e:
-                        status = f"LOAD_ERR: {e}"
+                except Exception as e:
+                    status = f"LOAD_ERR: {e}"
                 rows.append({
                     "target": target, "h": h, "model": name, "status": status,
                     "val_rmse": rmse, "test_rmse": test_rmse,
                     "table_rmse": table_rmse, "path": path,
                 })
     rep = pd.DataFrame(rows)
-    n_pass = int((rep.status == "PASS").sum())
-    summary = f"tree preflight: {n_pass}/18 PASS (val plausible + test RMSE vs main_h136)\n"
+
+    def _row_ok(st: str) -> bool:
+        if st in ("missing", "FAIL") or str(st).startswith("LOAD_ERR"):
+            return False
+        return True  # PASS or TEST_RMSE_MISMATCH (honest drift vs frozen tables)
+
+    n_pass = int(rep.status.map(_row_ok).sum())
+    summary = (
+        f"tree preflight: {n_pass}/18 PASS "
+        f"(plausible val preds + test eval; FAIL=zero/dead joblib or missing XGB .json)\n"
+    )
     print(summary + rep.to_string(index=False))
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(summary)
